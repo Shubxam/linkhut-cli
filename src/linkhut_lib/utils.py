@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Any
 import httpx
 import sys
 from config import LINKHUT_HEADER, LINKHUT_BASEURL, LINKPREVIEW_HEADER, LINKPREVIEW_BASEURL
@@ -35,11 +35,11 @@ def get_request_headers(site: Literal['LinkHut', 'LinkPreview']) -> dict[str, st
         request_headers: dict[str, str] = HEADER.copy()
         request_headers["X-Linkpreview-Api-Key"] = request_headers["X-Linkpreview-Api-Key"].format(API_KEY=pat)
         
-    logger.debug(f"header for {site} is {request_headers}")
+    # logger.debug(f"header for {site} is {request_headers}")
     return request_headers
 
 
-def make_get_request(url: str, header: dict[str, str]) -> dict[str, str]:
+def make_get_request(url: str, header: dict[str, str]) -> httpx.Response:
     """
     Make a GET request to the specified URL with the provided headers.
 
@@ -57,8 +57,9 @@ def make_get_request(url: str, header: dict[str, str]) -> dict[str, str]:
     """
     try:
         response = httpx.get(url=url, headers=header)
-        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
-        return response.json()
+        logger.debug(f"response from {url} is {response.json()} with status code {response.status_code}")
+        return response  # Ensure a response is always returned
+
     except httpx.HTTPStatusError as exc:
         raise RuntimeError(f"HTTP error occurred: {exc.response.status_code} - {exc.response.text}")
     except httpx.RequestError as exc:
@@ -87,11 +88,11 @@ def get_link_title(dest_url: str) -> str:
     request_headers: dict[str, str] = get_request_headers('LinkPreview')
 
 
-    response: dict[str, str] = make_get_request(url=api_url, header=request_headers)
-    return response['title']
+    response: httpx.Response = make_get_request(url=api_url, header=request_headers)
+    return response.json()['title']
 
 
-def get_tags_suggestion(dest_url: str) -> str:
+def get_tags_suggestion(dest_url: str) -> list[str]:
     """
     Fetch tags suggestion for a link using the LinkHut API.
     Args:
@@ -103,17 +104,16 @@ def get_tags_suggestion(dest_url: str) -> str:
     api_endpoint: str = "/v1/posts/suggest"
     fields: dict[str, str] = {
         "url": dest_url,
-        "fields": "tags"
     }
 
     logger.debug(f"fetching tags for : {dest_url}")
 
     response: list[dict[str, list[str]]] = linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
-    tag_list: list[str] = response[0].get('popular') + response[1].get('recommended')
+    tag_list: list[str] = response.json()[0].get('popular') + response[1].json().get('recommended')
     if len(tag_list) == 0:
-        return 'AutoTagFetchFailed'
+        return ['AutoTagFetchFailed']
     
-    return ','.join(tag_list)
+    return tag_list
 
 def encode_url(url: str) -> str:
     """
@@ -124,7 +124,7 @@ def encode_url(url: str) -> str:
     Returns:
         str: The encoded URL.
     """
-    return url.replace(":", "%3A").replace("/", "%2F").replace("?", "%3F").replace("&", "%26").replace("=", "%3D")
+    return url.replace(":", "%3A").replace("/", "%2F").replace("?", "%3F").replace("&", "%26").replace("=", "%3D").replace("\\", "%5C")
 
 def verify_url(url: str) -> bool:
     """
@@ -144,22 +144,31 @@ def verify_url(url: str) -> bool:
     
     return True
 
-def linkhut_api_call(api_endpoint: str, fields: dict[str, str]) -> dict[str, str]:
+def linkhut_api_call(api_endpoint: str, fields: dict[str, str]) -> tuple[Any, int]:
     """
-    Make an API call to the specified endpoint and return the response.
+    Make an API call to the specified LinkHut endpoint and return the response.
+    
+    Args:
+        api_endpoint (str): The API endpoint to call (e.g., "/v1/posts")
+        fields (dict[str, str], optional): Query parameters for the request
+        
+    Returns:
+        dict: The JSON response from the API
     """
     url: str = LINKHUT_BASEURL + api_endpoint
     
+    # Add query parameters if provided
     if fields:
         url += "?"
-    
-    for key, value in fields.items():
-        url += f"&{key}={value}"
+        params = []
+        for key, value in fields.items():
+            params.append(f"{key}={value}")
+        url += "&".join(params)
     
     header = get_request_headers(site='LinkHut')
     logger.debug(f"making request to {url} with header {header}")
-    response = make_get_request(url=url, header=header)
-    return response
+    response: httpx.Response = make_get_request(url=url, header=header)
+    return response.json(), response.status_code
 
 if __name__ == "__main__":
     # Example usage
@@ -168,4 +177,5 @@ if __name__ == "__main__":
     
     # print(f"Title info: {get_link_title(dest_url)}")
     # print(f"Tags suggestion: {get_tags_suggestion(dest_url_base)}")
-    print(f"verify url: {verify_url(dest_url)}")
+    # print(f"verify url: {verify_url(dest_url)}")
+    print(encode_url("\n Now I've read this"))
