@@ -5,5 +5,5 @@ package_author_email: shubxam@gmail.com
 package_author_name: Shubham Soni
 package_description: beautiful TUI to interact with your bookmarks stored on linkhut
 package_github_org: shubxam
-package_module: linkhut_cli
+package_module: linkhut_lib
 package_name: linkhut-cli
