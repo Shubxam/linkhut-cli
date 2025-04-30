@@ -40,6 +40,7 @@ classifiers = [
 dependencies = [
     "dotenv>=0.9.9",
     "httpx>=0.28.1",
+    "loguru>=0.7.3",
 ]
 
 
@@ -53,11 +54,12 @@ dev = [
     "rich>=13.9.4",
     "basedpyright>=1.28.2",
     "funlog>=0.2.0",
+    "ipykernel>=6.29.5",
 ]
 
 [project.scripts]
 # Add script entry points here:
-linkhut-cli = "linkhut_cli:main"
+linkhut-cli = "linkhut_lib:main"
 
 
 # ---- Build system ----
