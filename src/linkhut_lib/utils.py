@@ -1,7 +1,7 @@
 from typing import Literal, Any
 import httpx
 import sys
-from config import LINKHUT_HEADER, LINKHUT_BASEURL, LINKPREVIEW_HEADER, LINKPREVIEW_BASEURL
+from .config import LINKHUT_HEADER, LINKHUT_BASEURL, LINKPREVIEW_HEADER, LINKPREVIEW_BASEURL
 from dotenv import load_dotenv
 import os
 import re

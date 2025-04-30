@@ -1,4 +1,4 @@
-import utils
+from . import utils
 from loguru import logger
 
 def get_bookmarks(
