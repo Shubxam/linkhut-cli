@@ -271,9 +271,9 @@ def delete_bookmark_cmd(
 ):
     """Delete a bookmark from your LinkHut account.
     
-    This command deletes a bookmark identified by its URL. By default, it will
-    ask for confirmation before deleting. Use the --force option to skip the
-    confirmation prompt.
+    This command deletes a bookmark identified by its URL. It first shows the bookmark
+    details and then asks for confirmation before deleting. Use the --force option 
+    to skip the confirmation prompt.
     
     Returns:
         None: Results are printed directly to stdout
@@ -282,8 +282,45 @@ def delete_bookmark_cmd(
         return
     
     try:
+        # First fetch the bookmark details to show the user what they're deleting
+        bookmark_dict, status_code = get_bookmarks(url=url)
+        
+        if status_code != 200:
+            typer.secho(f"❌ Bookmark with URL '{url}' not found.", fg="red")
+            return
+        
+        # Extract bookmark details
+        bookmark = bookmark_dict.get('posts', [])[0] if bookmark_dict.get('posts') else None
+        
+        if not bookmark:
+            typer.secho(f"❌ Bookmark with URL '{url}' not found.", fg="red")
+            return
+        
+        # Display bookmark details
+        typer.secho("\nBookmark Details:", fg="bright_blue", bold=True)
+        
+        title = bookmark.get('description', 'No title')
+        bookmark_url = bookmark.get('href', '')
+        tags = bookmark.get('tags', '').split(',') if bookmark.get('tags') else []
+        tags_str = ', '.join(tags) if tags and tags[0] else 'None'
+        is_private = bookmark.get('shared') == 'no'
+        to_read = bookmark.get('toread') == 'yes'
+        note = bookmark.get('extended', '')
+        
+        typer.secho(f"Title: {title}", fg="bright_white", bold=True)
+        typer.echo(f"URL: {bookmark_url}")
+        typer.echo(f"Tags: {tags_str}")
+        typer.echo(f"Privacy: {'Private' if is_private else 'Public'}")
+        typer.echo(f"Read Status: {'To Read' if to_read else 'Read'}")
+        
+        if note:
+            typer.echo(f"Note: {note}")
+        
+        typer.echo("")  # Empty line for spacing
+        
+        # Ask for confirmation unless force flag is set
         if not force:
-            confirmed = typer.confirm(f"Are you sure you want to delete bookmark with URL: {url}?")
+            confirmed = typer.confirm("Are you sure you want to delete this bookmark?")
             if not confirmed:
                 typer.echo("Operation cancelled.")
                 return
@@ -293,73 +330,12 @@ def delete_bookmark_cmd(
         if success:
             typer.secho("✅ Bookmark deleted successfully!", fg="green")
         else:
-            typer.secho("❌ Failed to delete bookmark. It might not exist.", fg="red")
+            typer.secho("❌ Failed to delete bookmark.", fg="red")
             
     except Exception as e:
         typer.secho(f"Error deleting bookmark: {e}", fg="red", err=True)
         raise typer.Exit(code=1)
 
-
-@bookmarks_app.command("reading-list")
-def show_reading_list(
-    count: int = typer.Option(5, "--count", "-c", help="Number of bookmarks to show")
-):
-    """Show your reading list (bookmarks marked as to-read).
-    
-    This command fetches and displays your reading list, which consists of
-    bookmarks you've marked as 'to-read'. You can specify how many items
-    to display.
-    
-    Args:
-        count: Number of bookmarks to show (default: 5)
-        
-    Returns:
-        None: Results are printed directly to stdout
-    """
-    if not check_env_variables():
-        return
-    
-    try:
-        get_reading_list(count=count)
-        # Output formatting is handled by the get_reading_list function
-    except Exception as e:
-        typer.secho(f"Error fetching reading list: {e}", fg="red", err=True)
-        raise typer.Exit(code=1)
-
-
-@bookmarks_app.command("toggle-read")
-def toggle_read_status(
-    url: str = typer.Argument(..., help="URL of the bookmark"),
-    to_read: bool = typer.Option(True, "--to-read/--not-to-read", help="Whether to mark as to-read or not"),
-    note: str|None = typer.Option(None, "--note", "-n", help="Note to add"),
-    tags: list[str]|None = typer.Option(None, "--tag", "-g", help="Tags to add if bookmark doesn't exist"),
-):
-    """Toggle the to-read status of a bookmark.
-    
-    This command marks a bookmark as either 'to-read' or 'read'. If the bookmark
-    doesn't exist yet, it will be created with the specified status. You can also
-    add a note to the bookmark and specify tags if it's being created.
-    
-    By default, bookmarks are marked as to-read. Use --not-to-read to mark as read.
-    
-    Returns:
-        None: Results are printed directly to stdout
-    """
-    if not check_env_variables():
-        return
-    
-    try:
-        success = reading_list_toggle(url=url, to_read=to_read, note=note, tags=tags)
-        
-        if success:
-            status = "to-read" if to_read else "read"
-            typer.secho(f"✅ Bookmark marked as {status}!", fg="green")
-        else:
-            typer.secho("❌ Failed to update bookmark read status.", fg="red")
-            
-    except Exception as e:
-        typer.secho(f"Error updating read status: {e}", fg="red", err=True)
-        raise typer.Exit(code=1)
 
 
 # Tag commands
@@ -434,6 +410,116 @@ def delete_tag_cmd(
             
     except Exception as e:
         typer.secho(f"Error deleting tag: {e}", fg="red", err=True)
+        raise typer.Exit(code=1)
+
+
+# Add top-level commands for reading list and toggle-read
+@app.command("reading-list")
+def show_reading_list(
+    count: int = typer.Option(5, "--count", "-c", help="Number of bookmarks to show")
+):
+    """Display your reading list.
+    
+    Shows a list of bookmarks marked as 'to-read' in a clean format.
+    This command makes it easy to view your reading queue at a glance.
+    
+    Examples:
+        linkhut reading-list
+        linkhut reading-list --count 10
+    
+    Args:
+        count: Number of bookmarks to show (default: 5)
+    """
+    if not check_env_variables():
+        return
+    
+    try:
+        reading_list = get_reading_list(count=count)
+        
+        if not reading_list or not reading_list.get('posts'):
+            typer.echo("Your reading list is empty.")
+            return
+            
+        posts = reading_list.get('posts', [])
+        
+        for i, bookmark in enumerate(posts, 1):
+                        title = bookmark.get('description', 'No title')
+                        url = bookmark.get('href', '')
+                        tags = bookmark.get('tags', '').split(',') if bookmark.get('tags') else []
+                        note = bookmark.get('extended', '')
+                        
+                        typer.secho(f"{i}. {title}", fg="bright_white", bold=True)
+                        typer.echo(f"   URL: {url}")
+                        
+                        if tags and tags[0]:  # Check if tags exist and aren't empty
+                            tag_str = ", ".join(tags)
+                            typer.echo(f"   Tags: {tag_str}")
+                            
+                        if note:
+                            typer.echo(f"   Note: {note}")
+                            
+                        typer.echo("")  # Empty line between bookmarks
+        typer.echo(f"\nTo mark as read: linkhut toggle-read URL --not-to-read")
+        typer.echo(f"To view details: linkhut bookmarks list --url URL")
+        
+    except Exception as e:
+        typer.secho(f"Error fetching reading list: {e}", fg="red", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command("toggle-read")
+def toggle_read_status(
+    url: str = typer.Argument(..., help="URL of the bookmark"),
+    to_read: bool = typer.Option(True, "--to-read/--not-to-read", help="Whether to mark as to-read or not"),
+    note: str|None = typer.Option(None, "--note", "-n", help="Note to add"),
+    tags: list[str]|None = typer.Option(None, "--tag", "-g", help="Tags to add if bookmark doesn't exist"),
+):
+    """Add to reading list or mark as read.
+    
+    Quickly add URLs to your reading list or mark them as read.
+    Creates a new bookmark if it doesn't exist, or updates an existing one.
+    
+    Examples:
+        linkhut toggle-read https://example.com              # Add to reading list
+        linkhut toggle-read https://example.com --note "Important article"
+        linkhut toggle-read https://example.com --tag python --tag cli
+        linkhut toggle-read https://example.com --not-to-read # Mark as read
+    """
+    if not check_env_variables():
+        return
+    
+    try:
+        # First check if the bookmark exists to provide better feedback
+        _, status_code = get_bookmarks(url=url)
+        bookmark_exists = status_code == 200
+        
+        # Call the toggle function
+        success = reading_list_toggle(url=url, to_read=to_read, note=note, tags=tags)
+        
+        if success:
+            action = "Added to" if to_read else "Removed from"
+            
+            if bookmark_exists:
+                action = "Updated in" if to_read else "Removed from"
+                
+            typer.secho(f"✅ {action} reading list!", fg="green")
+            typer.echo(f"URL: {url}")
+            
+            if tags:
+                typer.echo(f"Tags: {', '.join(tags)}")
+            if note:
+                typer.echo(f"Note: {note}")
+                
+            # Show a helpful tip for the next possible action
+            if to_read:
+                typer.echo(f"\nTip: View your reading list with 'linkhut reading-list'")
+            else:
+                typer.echo(f"\nTip: Add it back to your reading list with 'linkhut toggle-read {url}'")
+        else:
+            typer.secho("❌ Failed to update reading list status.", fg="red")
+            
+    except Exception as e:
+        typer.secho(f"Error updating reading list: {e}", fg="red", err=True)
         raise typer.Exit(code=1)
 
 
