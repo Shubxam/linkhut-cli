@@ -5,7 +5,11 @@ including creating, updating, listing and deleting bookmarks, as well as managin
 """
 
 from . import utils
+import sys
 from loguru import logger
+
+logger.remove()
+logger.add(sys.stderr, level="INFO", format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
 
 def get_bookmarks(
     tag: list[str]|None = None,
@@ -255,8 +259,7 @@ def get_reading_list(count:int = 5):
     reading_list, status_code = get_bookmarks(tag=['unread'], count=count)
     if status_code == 200:
         logger.debug(f"Reading list fetched successfully: {reading_list}")
-        for i, bookmark in enumerate(reading_list.get('posts')):
-            print(f"{i}: Title: {bookmark.get('description')}, URL: {bookmark.get('href')}")
+        return reading_list
 
 def delete_bookmark(url: str) -> bool:
     """
