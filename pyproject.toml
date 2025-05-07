@@ -7,7 +7,7 @@ Repository = "https://github.com/shubxam/linkhut-cli"
 
 [project]
 name = "linkhut-cli"
-description = "beautiful TUI to interact with your bookmarks stored on linkhut"
+description = "beautiful TUI to manage your bookmarks stored on linkhut"
 authors = [
     { name="Shubham Soni", email="shubxam@gmail.com" },
 ]
@@ -34,6 +34,7 @@ classifiers = [
     # "Private :: Do Not Upload",
 ]
 
+keywords = ["bookmark-manager", "bookmarks", "tui"]
 
 # ---- Main dependencies ----
 
@@ -83,6 +84,7 @@ source = "uv-dynamic-versioning"
 vcs = "git"
 style = "pep440"
 bump = "true"
+fallback-version = "0.0.0"
 
 [tool.hatch.build.targets.wheel]
 # The source location for the package.
