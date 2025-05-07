@@ -8,7 +8,7 @@ import re
 from loguru import logger
 
 logger.remove()
-logger.add(sys.stderr, level="DEBUG", format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
+logger.add(sys.stderr, level="INFO", format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
 
 
 def get_request_headers(site: Literal['LinkHut', 'LinkPreview']) -> dict[str, str]:
@@ -108,8 +108,11 @@ def get_tags_suggestion(dest_url: str) -> list[str]:
 
     logger.debug(f"fetching tags for : {dest_url}")
 
-    response: list[dict[str, list[str]]] = linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
-    tag_list: list[str] = response.json()[0].get('popular') + response[1].json().get('recommended')
+    response, status_code = linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
+    if status_code != 200:
+        logger.error(f"Error fetching tags: {response}")
+        return ['AutoTagFetchFailed']
+    tag_list: list[str] = response[0].get('popular') + response[1].get('recommended')
     if len(tag_list) == 0:
         return ['AutoTagFetchFailed']
     
