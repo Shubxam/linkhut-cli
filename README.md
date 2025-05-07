@@ -2,12 +2,14 @@
 
 A powerful command-line interface for managing your bookmarks with LinkHut. Efficiently add, update, delete, and organize your bookmarks directly from the terminal.
 
+![alt text](res/image.png)
+
 ## Features
 
 - **Bookmark Management**: Add, update, delete, and list bookmarks
 - **Tag Management**: Rename and delete tags across all bookmarks
 - **Reading List**: Maintain a reading list with to-read/read status toggling
-- **Smart Features**: 
+- **Features**: 
   - Automatic title fetching when adding bookmarks
   - Tag suggestions based on bookmark content
   - Rich formatting for improved readability
@@ -35,8 +37,8 @@ pip install -e .
 
 The CLI requires two environment variables to function:
 
-- `LH_PAT`: Your LinkHut Personal Access Token
-- `LINK_PREVIEW_API_KEY`: API key for fetching link previews
+- `LH_PAT`: Your LinkHut Personal Access Token. (sign in and get it from [here](https://ln.ht/_/oauth))
+- `LINK_PREVIEW_API_KEY`: Free API key for fetching link previews (get it for free from [here](https://my.linkpreview.net/access_keys))
 
 You can set these in a `.env` file in the project root or set them in your environment.
 
@@ -52,6 +54,8 @@ linkhut config_status
 ### Managing Bookmarks
 
 #### Listing Bookmarks
+
+![alt text](res/image-1.png)
 
 ```bash
 # List your most recent bookmarks (default: 15)
@@ -72,6 +76,8 @@ linkhut bookmarks list --url https://example.com
 
 #### Adding Bookmarks
 
+![alt text](res/image-2.png)
+
 ```bash
 # Add with minimal info (title will be fetched automatically)
 linkhut bookmarks add https://example.com
@@ -80,12 +86,14 @@ linkhut bookmarks add https://example.com
 linkhut bookmarks add https://example.com \
   --title "Example Site" \
   --note "This is a note about the site" \
-  --tag dev --tag python \
+  --tag 'dev python' \
   --private \
   --to-read
 ```
 
 #### Updating Bookmarks
+
+![alt text](res/image-3.png)
 
 ```bash
 # Update tags
@@ -100,6 +108,8 @@ linkhut bookmarks update https://example.com --private  # or --public
 
 #### Deleting Bookmarks
 
+![alt text](res/image-4.png)
+
 ```bash
 # Delete with confirmation prompt
 linkhut bookmarks delete https://example.com
@@ -110,24 +120,37 @@ linkhut bookmarks delete https://example.com --force
 
 ### Reading List Operations
 
+#### Show Reading List
+
+![alt text](res/image-5.png)
+
 ```bash
-# View your reading list
-linkhut bookmarks reading-list
+# View your reading list in tabular format
+linkhut reading-list
 
 # Customize number of items shown
-linkhut bookmarks reading-list --count 10
+linkhut reading-list --count 10
+```
 
-# Mark a bookmark as to-read
-linkhut bookmarks toggle-read https://example.com --to-read
+#### Toggle Read Status
+
+![alt text](res/image-6.png)
+
+```bash
+
+# Add to reading list (mark as to-read)
+linkhut toggle-read https://example.com
+
+# Add with note and tags
+linkhut toggle-read https://example.com --note "Read by Friday" --tag python --tag article
 
 # Mark a bookmark as read
-linkhut bookmarks toggle-read https://example.com --not-to-read
-
-# Add a note when marking as to-read
-linkhut bookmarks toggle-read https://example.com --to-read --note "Read by Friday"
+linkhut toggle-read https://example.com --not-to-read
 ```
 
 ### Managing Tags
+
+![alt text](res/image-7.png)
 
 ```bash
 # Rename a tag across all bookmarks
