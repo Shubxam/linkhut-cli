@@ -1,3 +1,9 @@
+"""LinkHut Library - Core functions for interacting with LinkHut API.
+
+This module provides functions for managing bookmarks and tags through the LinkHut API,
+including creating, updating, listing and deleting bookmarks, as well as managing tags.
+"""
+
 from . import utils
 from loguru import logger
 
@@ -39,7 +45,7 @@ def get_bookmarks(
         api_endpoint = "/v1/posts/get"
         if tag:
             # /v1/posts/get expects tags=tag1+tag2...
-            fields["tags"] = ','.join(tag)
+            fields["tag"] = ','.join(tag)
         if date:
             # /v1/posts/get takes dt=CCYY-MM-DDThh:mm:ssZ
             fields["dt"] = date # TODO: Add validation/formatting for CCYY-MM-DDThh:mm:ssZ
@@ -69,15 +75,22 @@ def create_bookmark(
     """
     Create a new bookmark in LinkHut.
     
+    This function creates a new bookmark with the specified URL and optional metadata.
+    If title is not provided, it will attempt to fetch the title automatically from the URL.
+    If tags are not provided and fetch_tags is True, it will attempt to suggest tags based on the URL content.
+    
     Args:
         url (str): The URL to bookmark
         title (Optional[str]): Title for the bookmark. If None, fetches automatically.
-        description (Optional[str]): Description for the bookmark
-        tags (Optional[List[str]]): List of tags to apply to the bookmark
-        private (bool): Whether the bookmark should be private
+        note (Optional[str]): Extended notes or description for the bookmark
+        tags (Optional[list[str]]): List of tags to apply to the bookmark
+        fetch_tags (bool): Whether to auto-suggest tags if none provided (default: True)
+        private (bool): Whether the bookmark should be private (default: False)
+        to_read (bool): Whether to mark the bookmark as "to read" (default: False)
+        replace (bool): Whether to replace an existing bookmark with the same URL (default: False)
         
     Returns:
-        Dict[str, Any]: The created bookmark data
+        int: HTTP status code (200 for success)
     """
     utils.verify_url(url)
     
@@ -129,7 +142,22 @@ def create_bookmark(
     return status_code
 
 def reading_list_toggle(url: str, to_read: bool, note: str|None=None, tags:list[str]|None=None) -> bool:
-
+    """
+    Toggle the to-read status of a bookmark.
+    
+    This function either updates an existing bookmark's to-read status or creates a new 
+    bookmark with the specified to-read status if it doesn't exist.
+    
+    Args:
+        url (str): The URL of the bookmark to toggle
+        to_read (bool): Whether to mark as to-read (True) or read (False)
+        note (Optional[str]): Note to append to the bookmark if provided
+        tags (Optional[list[str]]): Tags to add if creating a new bookmark
+        
+    Returns:
+        bool: True if the operation was successful, False otherwise
+    """
+    
     bookmark_create_status_code: None|int = None
 
     #check if bookmark with url already exists,
@@ -168,6 +196,21 @@ def reading_list_toggle(url: str, to_read: bool, note: str|None=None, tags:list[
         return False
 
 def update_bookmark(url: str, new_tag: list[str]|None = None, new_note: str|None = None, private: bool|None = None) -> bool:
+    """
+    Update an existing bookmark or create a new one if it doesn't exist.
+    
+    This function allows updating the tags, notes, and privacy settings of a bookmark.
+    If the bookmark doesn't exist, it will create a new one with the provided parameters.
+    
+    Args:
+        url (str): The URL of the bookmark to update
+        new_tag (Optional[list[str]]): New tags to set for the bookmark (replaces existing tags)
+        new_note (Optional[str]): Note to append to the existing note
+        private (Optional[bool]): Whether to set the bookmark as private (True) or public (False)
+        
+    Returns:
+        bool: True if the update was successful, False otherwise
+    """
     # todo: add append to tags
 
     # check if there is nothing to update, if so return false
@@ -200,6 +243,15 @@ def update_bookmark(url: str, new_tag: list[str]|None = None, new_note: str|None
     
 
 def get_reading_list(count:int = 5):
+    """
+    Fetch and display the user's reading list (bookmarks marked as to-read).
+    
+    Args:
+        count (int): Number of bookmarks to fetch (default: 5)
+        
+    Returns:
+        None: Results are printed directly to stdout
+    """
     reading_list, status_code = get_bookmarks(tag=['unread'], count=count)
     if status_code == 200:
         logger.debug(f"Reading list fetched successfully: {reading_list}")
@@ -293,15 +345,28 @@ def delete_tag(tag: str) -> bool:
 
 if __name__ == "__main__":
     # Example usage
-    url = "https://huggingface.co/blog/gradio-mcp"
+    # These examples show how to use the library functions directly
+    # Uncomment any of these lines to test the functionality
+    
+    # url = "https://huggingface.co/blog/gradio-mcp"
     # title = "Example Title"
     # note = "This is a note."
     # tags = ["tag1", "tag2"]
     
+    # 1. Create a new bookmark
     # create_bookmark(url=url)
+    
+    # 2. Mark a bookmark as to-read
     # reading_list_toggle(url, to_read=True, tags=['MCP'])
-    # update_bookmark(url=url,private=False)
+    
+    # 3. Update a bookmark's privacy setting
+    # update_bookmark(url=url, private=False)
+    
+    # 4. Delete a bookmark
     # delete_bookmark(url)
-    # print(get_bookmarks(tag=["repo", "python"]))
-    # print(bookmarks)
-    get_reading_list(count=5)
+    
+    # 5. List bookmarks with a specific tag
+    print(get_bookmarks(tag=["blog"]))
+    
+    # 6. Show reading list
+    # get_reading_list(count=5)
