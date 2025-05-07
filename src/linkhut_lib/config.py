@@ -7,8 +7,8 @@ The actual API keys are inserted into these templates at runtime.
 
 # LinkHut API configuration
 LINKHUT_HEADER: dict[str, str] = {
-    'Accept':'application/json',
-    'Authorization':'Bearer {PAT}',  # PAT placeholder replaced at runtime
+    "Accept": "application/json",
+    "Authorization": "Bearer {PAT}",  # PAT placeholder replaced at runtime
 }
 LINKHUT_BASEURL: str = "https://api.ln.ht"
 

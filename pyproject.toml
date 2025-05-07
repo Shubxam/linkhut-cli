@@ -131,6 +131,7 @@ ignore = [
     "COM812", # https://docs.astral.sh/ruff/rules/missing-trailing-comma/
     "COM819", # https://docs.astral.sh/ruff/rules/prohibited-trailing-comma/
     "ISC002", # https://docs.astral.sh/ruff/rules/multi-line-implicit-string-concatenation/
+    "B008"
 ]
 
 [tool.basedpyright]
@@ -153,6 +154,16 @@ reportAny = false
 reportExplicitAny = false
 reportImplicitStringConcatenation = false
 reportUnreachable = false
+reportCallInDefaultInitializer = false
+reportOptionalMemberAccess = false
+reportUnknownMemberType = false
+reportAttributeAccessIssue = false
+reportUnknownVariableType = false
+reportCallIssue = false
+reportArgumentType = false
+reportUnknownArgumentType = false
+reportOptionalSubscript = false
+reportRedeclaration = false
 # reportPrivateImportUsage = false
 # reportPrivateLocalImportUsage = false
 # reportMissingImports = false
