@@ -1,6 +1,7 @@
 # LinkHut CLI
 
 [![PyPI Downloads](https://static.pepy.tech/badge/linkhut-cli)](https://pepy.tech/projects/linkhut-cli)
+[![PyPI version](https://badge.fury.io/py/linkhut-cli.svg)](https://badge.fury.io/py/linkhut-cli)
 
 A powerful command-line interface for managing your bookmarks with LinkHut. Efficiently add, update, delete, and organize your bookmarks directly from the terminal.
 
