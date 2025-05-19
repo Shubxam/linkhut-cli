@@ -230,7 +230,7 @@ def add_bookmark(
         typer.secho(f"Error creating bookmark: {fields_dict.get('status')}", fg="yellow")
         
 
-def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool):
+def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool, to_read: bool = False) -> None:
     """Add multiple bookmarks to your LinkHut account.
 
     This function takes a string of URLs separated by newlines or commas and
