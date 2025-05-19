@@ -7,7 +7,13 @@ import httpx
 from dotenv import load_dotenv
 from loguru import logger
 
-from .config import LINKHUT_BASEURL, LINKHUT_HEADER, LINKPREVIEW_BASEURL, LINKPREVIEW_HEADER
+from .config import (
+    LINKHUT_API_ENDPOINTS,
+    LINKHUT_BASEURL,
+    LINKHUT_HEADER,
+    LINKPREVIEW_BASEURL,
+    LINKPREVIEW_HEADER,
+)
 
 logger.remove()
 logger.add(
@@ -64,9 +70,10 @@ def make_get_request(url: str, header: dict[str, str]) -> httpx.Response:
         httpx.RequestError: If there is a network-related error.
     """
     try:
+        logger.debug(f"making get request to following url: {url}")
         response = httpx.get(url=url, headers=header)
         logger.debug(
-            f"response from {url} is {response.json()} with status code {response.status_code}"
+            f"response is {response.json()} with status code {response.status_code}"  # todo: prettify json output
         )
         return response  # Ensure a response is always returned
 
@@ -80,6 +87,35 @@ def make_get_request(url: str, header: dict[str, str]) -> httpx.Response:
         ) from exc
     except Exception as e:
         raise RuntimeError(f"An unexpected error occurred: {e}") from e
+    
+
+def linkhut_api_call(action: str, fields: dict[str, str] | None) -> httpx.Response:
+    """
+    Make an API call to the specified LinkHut endpoint and return the response.
+
+    Args:
+        action (str): The API action to perform (e.g., "bookmark_create")
+        fields (dict[str, str], optional): Query parameters for the request
+
+    Returns:
+        Response: The response object from the API
+    """
+    # Note: Different API endpoints return different data, let the calling function handle the extraction and exception handling.
+    # calling functions will define how to handle the exception and the replacement values to use if http request fails.
+    url: str = LINKHUT_BASEURL + LINKHUT_API_ENDPOINTS[action]
+
+    # Add query parameters if provided
+    if fields:
+        url += "?"
+        params = []
+        for key, value in fields.items():
+            params.append(f"{key}={value}")
+        url += "&".join(params)
+
+    header = get_request_headers(site="LinkHut")
+    logger.debug(f"making request to {url} with header {header}")
+    response: httpx.Response = make_get_request(url=url, header=header)
+    return response
 
 
 def get_link_title(dest_url: str) -> str:
@@ -101,35 +137,46 @@ def get_link_title(dest_url: str) -> str:
 
     request_headers: dict[str, str] = get_request_headers("LinkPreview")
 
-    response: httpx.Response = make_get_request(url=api_url, header=request_headers)
-    return response.json()["title"]
-
-
-def get_tags_suggestion(dest_url: str) -> list[str]:
+def get_tags_suggestion(dest_url: str) -> str:
     """
     Fetch tags suggestion for a link using the LinkHut API.
     Args:
         dest_url (str): The URL of the link to fetch tags for.
 
     Returns:
-        str: A comma-separated string of suggested tags.
+        str: A str of suggested tags seperated by comma.
+
+    Note: returns "AutoTagFetchFailed" if the request fails or no suggested tags found.
     """
-    api_endpoint: str = "/v1/posts/suggest"
+    action: str = "tag_suggest"
     fields: dict[str, str] = {
         "url": dest_url,
     }
 
-    logger.debug(f"fetching tags for : {dest_url}")
+    logger.debug(f"fetching suggested tags for : {dest_url}")
 
-    response, status_code = linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
-    if status_code != 200:
-        logger.error(f"Error fetching tags: {response}")
-        return ["AutoTagFetchFailed"]
-    tag_list: list[str] = response[0].get("popular") + response[1].get("recommended")
-    if len(tag_list) == 0:
-        return ["AutoTagFetchFailed"]
+    try:
+        response: httpx.Response = linkhut_api_call(action=action, fields=fields)
+        # above call will always return a response (200)
 
-    return tag_list
+        status_code: int = response.status_code
+        response_dict: list[dict[str, list[str]]] = response.json()
+
+        if status_code == 200:
+            tag_list: list[str] = response_dict[0]["popular"] + response_dict[1]["recommended"]
+            if len(tag_list) > 0:
+                return ",".join(tag_list)
+            else:
+                logger.warning(f"No auto tag suggestions found for: {dest_url}")
+                return "AutoTagFetchFailed"
+        else:
+            logger.warning("Issue with the API. Auto Tag Fetch Failed.")
+            return "AutoTagFetchFailed"
+        
+    except Exception as e:
+        # if there is a network error or the API is down, we handle that in the following exception.
+        logger.error(f"Error fetching tags for {dest_url}: {e}")
+        return "AutoTagFetchFailed"
 
 
 def encode_url(url: str) -> str:
@@ -168,33 +215,6 @@ def verify_url(url: str) -> bool:
         raise ValueError("Invalid URL: length exceeds 2048 characters")
 
     return True
-
-
-def linkhut_api_call(api_endpoint: str, fields: dict[str, str]) -> tuple[Any, int]:
-    """
-    Make an API call to the specified LinkHut endpoint and return the response.
-
-    Args:
-        api_endpoint (str): The API endpoint to call (e.g., "/v1/posts")
-        fields (dict[str, str], optional): Query parameters for the request
-
-    Returns:
-        dict: The JSON response from the API
-    """
-    url: str = LINKHUT_BASEURL + api_endpoint
-
-    # Add query parameters if provided
-    if fields:
-        url += "?"
-        params = []
-        for key, value in fields.items():
-            params.append(f"{key}={value}")
-        url += "&".join(params)
-
-    header = get_request_headers(site="LinkHut")
-    logger.debug(f"making request to {url} with header {header}")
-    response: httpx.Response = make_get_request(url=url, header=header)
-    return response.json(), response.status_code
 
 
 if __name__ == "__main__":

@@ -12,6 +12,15 @@ LINKHUT_HEADER: dict[str, str] = {
 }
 LINKHUT_BASEURL: str = "https://api.ln.ht"
 
+# LinkHut API endpoints
+LINKHUT_API_ENDPOINTS: dict[str, str] = {
+    "bookmark_create": "/v1/posts/add",
+    "tag_suggest": "/v1/posts/suggest",
+    "bookmark_recent": "/v1/posts/recent",
+    "bookmark_get": "/v1/posts/get",
+}
+
+
 # LinkPreview API configuration
 LINKPREVIEW_HEADER: dict[str, str] = {
     "X-Linkpreview-Api-Key": "{API_KEY}"  # API_KEY placeholder replaced at runtime

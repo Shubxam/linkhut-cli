@@ -43,17 +43,17 @@ def get_bookmarks(
         dict[str, list]: Response dictionary containing bookmarks.
     """
     fields = {}
-    api_endpoint = ""
+    action: str
 
     if count is not None:
-        api_endpoint = "/v1/posts/recent"
+        action = "bookmark_recent"
         fields["count"] = count
         if tag:
             # /v1/posts/recent accept only one tag
             fields["tag"] = tag[0]
             logger.debug(f"Using first tag for /recent endpoint: {tag[0]}")
     elif tag or date or url:
-        api_endpoint = "/v1/posts/get"
+        action = "bookmark_get"
         if tag:
             # /v1/posts/get expects tags=tag1+tag2...
             fields["tag"] = ",".join(tag)
@@ -65,14 +65,10 @@ def get_bookmarks(
             fields["url"] = url  # TODO: Add URL encoding if necessary utils.encode_url(url)
     else:
         # Default behavior: get recent 15 posts
-        api_endpoint = "/v1/posts/recent"
+        action = "bookmark_recent"
         fields["count"] = 15
 
-    response_obj, response_code = utils.linkhut_api_call(
-        api_endpoint=api_endpoint, fields=fields if fields else None
-    )
-
-    return response_obj, response_code
+            action=action, fields=fields if fields else None  # type: ignore
 
 
 def create_bookmark(
@@ -111,7 +107,7 @@ def create_bookmark(
         logger.error(f"Invalid URL: {url}. Error: {e}")
         return {"status": "invalid_url"}
     
-    
+    action = "bookmark_create"
 
     # If title not provided, try to fetch it
     if title is None:
@@ -303,8 +299,8 @@ def get_reading_list(count: int = 5):
     Returns:
         None: Results are printed directly to stdout
     """
-    reading_list, status_code = get_bookmarks(tag=["unread"], count=count)
-    if status_code == 200:
+    reading_list = get_bookmarks(tag="unread", count=count)
+    if reading_list:
         logger.debug(f"Reading list fetched successfully: {reading_list}")
         return reading_list
 
@@ -319,16 +315,16 @@ def delete_bookmark(url: str) -> bool:
     Returns:
         Dict[str, Any]: Response from the API
     """
-    api_endpoint = "/v1/posts/delete"
+    action = "bookmark_delete"
     fields = {"url": url}
 
-    _, status_code = utils.linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
+    response: Response = utils.linkhut_api_call(action=action, fields=fields)
 
-    if status_code == 200:
+    if response.status_code == 200:
         logger.debug(f"Bookmark with URL {url} successfully deleted.")
         return True
     else:
-        logger.error(f"No bookmark with URL {url} exists. Status code: {status_code}")
+        logger.error(f"No bookmark with URL {url} exists. Status code: {response.status_code}")
         return False
 
 
@@ -343,16 +339,16 @@ def rename_tag(old_tag: str, new_tag: str) -> bool:
     Returns:
         Dict[str, Any]: Response from the API
     """
-    api_endpoint = "/v1/tags/rename"
+    action = "tag_rename"
     fields = {"old": old_tag, "new": new_tag}
 
-    _, status_code = utils.linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
+    response: Response = utils.linkhut_api_call(action=action, fields=fields)
 
-    if status_code == 200:
-        logger.debug(f"Tag '{old_tag}' successfully renamed to '{new_tag}'.")
+    if response.status_code == 200:
+        logger.info(f"Tag '{old_tag}' successfully renamed to '{new_tag}'.")
         return True
     else:
-        logger.error(f"Failed to rename tag '{old_tag}' to '{new_tag}'. Status code: {status_code}")
+        logger.error(f"Failed to rename tag '{old_tag}' to '{new_tag}'. Status code: {response.status_code}")
         return False
 
 
@@ -366,16 +362,16 @@ def delete_tag(tag: str) -> bool:
     Returns:
         Dict[str, Any]: Response from the API
     """
-    api_endpoint = "/v1/tags/delete"
-    fields = {"tag": tag}
+    action = "tag_delete"
+    fields: dict[str, str] = {"tag": tag}
 
-    _, status_code = utils.linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
+    response: Response = utils.linkhut_api_call(action=action, fields=fields)
 
-    if status_code == 200:
+    if response.status_code == 200:
         logger.debug(f"Tag '{tag}' successfully deleted.")
         return True
     else:
-        logger.error(f"Failed to delete tag '{tag}'. Tag doesn't exist. Status code: {status_code}")
+        logger.error(f"Failed to delete tag '{tag}'. Tag doesn't exist. Status code: {response.status_code}")
         return False
 
 
