@@ -27,7 +27,7 @@ from linkhut_lib.linkhut_lib import (
     update_bookmark,
 )
 
-from .utils import parse_bulk_urls
+from .utils import parse_bulk_items
 
 app = typer.Typer(help="LinkHut CLI - Manage your bookmarks from the command line")
 bookmarks_app = typer.Typer(help="Manage bookmarks")
@@ -252,7 +252,7 @@ def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool):
     Returns:
         None: Results are printed directly to stdout
     """
-    urls_list = parse_bulk_urls(urls)
+    urls_list: list[str] = parse_bulk_items(content=urls, type="url")
     for url in urls_list:
         add_bookmark(url=url, note=note, tags=tags, private=private)
 

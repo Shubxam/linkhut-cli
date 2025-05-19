@@ -1,12 +1,17 @@
 import re
+from typing import Literal
 
 
-def parse_bulk_urls(urls: str) -> list[str]:
+def parse_bulk_items(content: str, type: Literal["url", "tag"]) -> list[str]:
     """
-    Parse a string of URLs separated by newlines or commas into a list of URLs.
+    Parse a string of items(URLs, tags) separated by newlines, commas, whitespace into a list of items.
     Args:
-        urls (str): A string containing URLs separated by newlines or commas.
+        content (str): A string containing items separated by newlines, commas, whitespace.
+        type (str): The type of items to parse. Can be "url" or "tag".
     Returns:
-        list[str]: A list of URLs.
+        list[str]: A list of items.
     """
-    return [url.strip() for url in re.split(r"[,\n]+", urls) if url.strip()]
+    if type == "url":
+        return [item.strip() for item in re.split(r"[,\n]+", content) if item.strip()]
+    elif type == "tag":
+        return [item.strip() for item in re.split(r"[,\s]+", content) if item.strip()]
