@@ -73,14 +73,14 @@ def get_bookmarks(
 
 def create_bookmark(
     url: str,
-    title: str | None = None,
-    note: str | None = None,
-    tags: list[str] | None = None,
+    title: str = "",
+    note: str = "",
+    tags: str = "",  # could be of any form: "tag1,tag2" or "tag1 tag2" or "tag1 tag2,tag3" or "tag1, tag2, tag3"
     fetch_tags: bool = True,
     private: bool = False,
     to_read: bool = False,
     replace: bool = False,
-) -> int:
+) -> dict[str, str]:
     """
     Create a new bookmark in LinkHut.
 
@@ -90,16 +90,16 @@ def create_bookmark(
 
     Args:
         url (str): The URL to bookmark
-        title (Optional[str]): Title for the bookmark. If None, fetches automatically.
-        note (Optional[str]): Extended notes or description for the bookmark
-        tags (Optional[list[str]]): List of tags to apply to the bookmark
+        title (str): Title for the bookmark. If None, fetches automatically.
+        note (str): Extended notes or description for the bookmark
+        tags (str): Comma-separated list of tags to apply to the bookmark
         fetch_tags (bool): Whether to auto-suggest tags if none provided (default: True)
         private (bool): Whether the bookmark should be private (default: False)
         to_read (bool): Whether to mark the bookmark as "to read" (default: False)
         replace (bool): Whether to replace an existing bookmark with the same URL (default: False)
 
     Returns:
-        int: HTTP status code (200 for success)
+        dict[str, str]: The created bookmark's metadata
     """
     try:
         utils.verify_url(url)
@@ -110,48 +110,42 @@ def create_bookmark(
     action = "bookmark_create"
 
     # If title not provided, try to fetch it
-    if title is None:
-        try:
-            title = utils.get_link_title(url)
-            logger.debug(f"Auto-fetched title: {title}")
-        except Exception as e:
-            logger.warning(f"Failed to auto-fetch title: {e}")
-            title = url
+    if not title:        
+        title = utils.get_link_title(url)
 
     # If tags not provided, try to fetch suggestions
-    if tags is None and fetch_tags:
-        try:
-            suggested_tags: list[str] = utils.get_tags_suggestion(url)
-            tags = suggested_tags
-        except Exception as e:
-            logger.warning(f"Failed to auto-suggest tags: {e}")
-            tags = []
+    if not tags and fetch_tags:
+        tags = utils.get_tags_suggestion(url)  # comma separated tags
+
+    if tags:
+        _tag_list: list[str] = tags.replace(",", " ").split()
+        tags = "+".join(_tag_list)
 
     # Prepare API payload
-    fields = {"url": url, "description": title}
+    fields: dict[str, str] = {}
+    fields['url'] = url
+    fields["description"] = title
+    fields["tags"] = tags
+    fields["replace"] = "yes" if replace else "no"
+    fields["toread"] = "yes" if to_read else "no"
+    fields["shared"] = "no" if private else "yes"
 
     if note:
         fields["extended"] = note
 
-    if private:
-        fields["shared"] = "no"
-
-    if tags:
-        fields["tags"] = ",".join(tags)
-
-    if to_read:
-        fields["toread"] = "yes"
-    if replace:
-        fields["replace"] = "yes"
-
-    # Make API call
-    api_endpoint = "/v1/posts/add"
-    _, status_code = utils.linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
-
-    if status_code == 200:
-        logger.debug(f"Bookmark created successfully: {fields}")
-
-    return status_code
+    try:
+        response: Response = utils.linkhut_api_call(action=action, fields=fields)
+        response_dict: dict[str, str] = response.json()
+        status_code: int = response.status_code
+        if status_code == 200 and response_dict.get("result_code") == "done":
+            logger.debug(f"Bookmark created successfully: {response_dict}")
+            return fields
+        else:
+            logger.error(f"Failed to create bookmark: {response_dict}")
+            return {"status": "bookmark already exists"}
+    except Exception as e:
+        logger.error(f"Error creating bookmark: {e}")
+        return {"status": "API error"}
 
 
 def reading_list_toggle(

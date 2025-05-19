@@ -1,7 +1,9 @@
+# todo: make the order of the return types of functions with api calls consistent. i.e. all the functions which call make_get_request should use `return response.json(), response.status_code`
+
 import os
 import re
 import sys
-from typing import Any, Literal
+from typing import Literal
 
 import httpx
 from dotenv import load_dotenv
@@ -125,17 +127,38 @@ def get_link_title(dest_url: str) -> str:
         dest_url (str): The URL of the link to fetch the title for.
 
     Returns:
-        str: The title of the link.
+        - str: The title of the link.
+            
+    Note: returns url as title if the request fails.
     """
     # verify_url(url)
+    title: str
     dest_url_str: str = f"q={dest_url}"
-    fields_str = "fields=title,description,url"
-    api_endpoint: str = f"/?{fields_str}&{dest_url_str}"
+
+    # fetch the following fields: title, description, url (disabling, as it doesn't work)
+    # fields_str = "fields=title,description,url"
+    
+    # allow websites with blocked content
+    block_content: str = "block_content=false"
+    
+    api_endpoint: str = f"/?{block_content}&{dest_url_str}"
     api_url: str = LINKPREVIEW_BASEURL + api_endpoint
 
-    logger.debug(f"fetching title for : {api_url}")
+    logger.debug(f"making request to get title : {api_url}")
 
-    request_headers: dict[str, str] = get_request_headers("LinkPreview")
+    header: dict[str, str] = get_request_headers("LinkPreview")
+
+    try:
+        response: httpx.Response = make_get_request(url=api_url, header=header)
+        title_str: str = response.json().get("title", "")
+        title = title_str if title_str else dest_url
+    except Exception as e:
+        logger.error(f"Error fetching the title for {dest_url}: {e}")
+        title = dest_url
+
+    # function is supposed to send link title, so we send link title by handling the exceptions here.
+    return title
+
 
 def get_tags_suggestion(dest_url: str) -> str:
     """
