@@ -27,6 +27,8 @@ from linkhut_lib.linkhut_lib import (
     update_bookmark,
 )
 
+from .utils import parse_bulk_urls
+
 app = typer.Typer(help="LinkHut CLI - Manage your bookmarks from the command line")
 bookmarks_app = typer.Typer(help="Manage bookmarks")
 tags_app = typer.Typer(help="Manage tags")
@@ -184,11 +186,7 @@ def list_bookmarks(
 @bookmarks_app.command("add")
 def add_bookmark(
     url: str = typer.Argument(..., help="URL of the bookmark"),
-    title: str | None = typer.Option(None, "--title", "-t", help="Title of the bookmark"),
-    note: str | None = typer.Option(None, "--note", "-n", help="Note for the bookmark"),
-    tags: list[str] | None = typer.Option(
-        None, "--tag", "-g", help="Tags to associate with the bookmark"
-    ),
+    bulk: bool = typer.Option(False, "--bulk", "-b", help="Add multiple bookmarks"),
     private: bool = typer.Option(False, "--private", "-p", help="Make the bookmark private"),
     to_read: bool = typer.Option(False, "--to-read", "-r", help="Mark as to-read"),
 ):
@@ -205,6 +203,14 @@ def add_bookmark(
     """
     if not check_env_variables():
         return
+    
+    if bulk:
+        try:
+            add_bulk_bookmarks(urls=url, note=note, tags=tags, private=private)
+            typer.secho("✅ all bookmarks added successfully!", fg="green")
+        except Exception as e:
+            typer.secho(f"Error adding bulk bookmarks: {e}", fg="red", err=True)
+            raise typer.Exit(code=1) from e
 
     try:
         status_code = create_bookmark(
@@ -228,6 +234,27 @@ def add_bookmark(
     except Exception as e:
         typer.secho(f"Error creating bookmark: {e}", fg="red", err=True)
         raise typer.Exit(code=1) from e
+    
+
+def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool):
+    """Add multiple bookmarks to your LinkHut account.
+
+    This function takes a string of URLs separated by newlines or commas and
+    adds them as bookmarks. It also allows for optional metadata like notes,
+    tags, and privacy settings.
+
+    Args:
+        urls (str): A string containing URLs separated by newlines or commas.
+        note (str): Note to associate with the bookmarks.
+        tags (str): Tags to associate with the bookmarks.
+        private (bool): Whether to make the bookmarks private.
+
+    Returns:
+        None: Results are printed directly to stdout
+    """
+    urls_list = parse_bulk_urls(urls)
+    for url in urls_list:
+        add_bookmark(url=url, note=note, tags=tags, private=private)
 
 
 @bookmarks_app.command("update")
