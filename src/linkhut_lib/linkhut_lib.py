@@ -6,6 +6,7 @@ including creating, updating, listing and deleting bookmarks, as well as managin
 
 import sys
 
+from httpx import Response
 from loguru import logger
 
 from . import utils
@@ -19,13 +20,13 @@ logger.add(
 
 
 def get_bookmarks(
-    tag: list[str] | None = None,
-    date: str | None = None,
-    url: str | None = None,
+    tag: str = "",
+    date: str = "",
+    url: str = "",
     count: int | None = None,
-) -> tuple[dict[str, str], int]:
+) -> list[dict]:
     """
-    Get bookmarks from LinkHut. Supports filtering or fetching recent bookmarks.
+    Get bookmarks from LinkHut. Supports filtering or fetching by recent count.
 
     - If 'count' is provided, fetches the most recent 'count' bookmarks,
       optionally filtered by the first tag in the 'tag' list. Uses /v1/posts/recent.
@@ -34,41 +35,57 @@ def get_bookmarks(
     - If no arguments are provided, fetches the 15 most recent bookmarks.
 
     Args:
-        tag (Optional[list[str]]): Filter by tags (for /get) or a single tag (first element used for /recent).
-        date (Optional[str]): Filter by date (CCYY-MM-DDThh:mm:ssZ format expected by /get).
-        url (Optional[str]): Filter by exact URL (for /get).
-        count (Optional[int]): Number of recent bookmarks to fetch (for /recent).
+        tag (str): Filter by tags (for /get) or a single tag (first element used for /recent).
+        date (str): Filter by date (CCYY-MM-DDThh:mm:ssZ format expected by /get).
+        url (str): Filter by exact URL (for /get).
+        count (int|None): Number of recent bookmarks to fetch (for /recent).
 
     Returns:
-        dict[str, list]: Response dictionary containing bookmarks.
+        list[dict]: list of dictionaries containing bookmark metadata.
     """
-    fields = {}
+    fields: dict[str, str | int] = {}
     action: str
 
     if count is not None:
         action = "bookmark_recent"
         fields["count"] = count
         if tag:
-            # /v1/posts/recent accept only one tag
-            fields["tag"] = tag[0]
-            logger.debug(f"Using first tag for /recent endpoint: {tag[0]}")
+            # bookmark_recent accept only one tag
+            fields["tag"] = tag.replace(",", " ").split()[0]
+            logger.debug(f"Using first tag for /recent endpoint: {fields['tag']}")
     elif tag or date or url:
         action = "bookmark_get"
         if tag:
-            # /v1/posts/get expects tags=tag1+tag2...
-            fields["tag"] = ",".join(tag)
+            # bookmark_get expects tags=tag1+tag2...
+            fields["tag"] = tag.replace(" ", "+").replace(",", "+")
         if date:
-            # /v1/posts/get takes dt=CCYY-MM-DDThh:mm:ssZ
-            fields["dt"] = date  # TODO: Add validation/formatting for CCYY-MM-DDThh:mm:ssZ
+            # bookmark_get takes dt=CCYY-MM-DDThh:mm:ssZ
+            # TODO: Add validation/formatting for CCYY-MM-DDThh:mm:ssZ
+            fields["dt"] = date  
         if url:
             # utils.verify_url(url)
-            fields["url"] = url  # TODO: Add URL encoding if necessary utils.encode_url(url)
+            # TODO: Add URL encoding if necessary utils.encode_url(url)
+            fields["url"] = url
     else:
         # Default behavior: get recent 15 posts
         action = "bookmark_recent"
         fields["count"] = 15
 
+    try:
+        response: Response = utils.linkhut_api_call(
             action=action, fields=fields if fields else None  # type: ignore
+        )
+        response_dict: list[dict[str, str | int]] = response.json()["posts"]
+        status_code: int = response.status_code
+        if status_code == 200 and len(response_dict) > 0:
+            logger.debug("Bookmarks fetched successfully")
+            return response_dict
+        else:
+            logger.error("No Bookmarks Found")
+            return []
+    except Exception as e:
+        logger.error(f"Error fetching bookmarks: {e}")
+        return []
 
 
 def create_bookmark(
