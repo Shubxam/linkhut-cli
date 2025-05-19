@@ -185,11 +185,14 @@ def list_bookmarks(
 
 @bookmarks_app.command("add")
 def add_bookmark(
-    url: str = typer.Argument(..., help="URL of the bookmark"),
+    url: str = typer.Argument(..., help="URL of the bookmark, must start with http:// or https://"),
     bulk: bool = typer.Option(False, "--bulk", "-b", help="Add multiple bookmarks"),
+    title: str = typer.Option("", "--title", "-t", help="Title of the bookmark"),
+    note: str = typer.Option("", "--note", "-n", help="Note for the bookmark"),
+    tags: str = typer.Option("", "--tag", "-g", help="Tags to associate with the bookmark"),
     private: bool = typer.Option(False, "--private", "-p", help="Make the bookmark private"),
     to_read: bool = typer.Option(False, "--to-read", "-r", help="Mark as to-read"),
-):
+) -> None:
     """Add a new bookmark to your LinkHut account.
 
     This command creates a new bookmark with the specified URL and optional metadata.
@@ -201,40 +204,31 @@ def add_bookmark(
     Returns:
         None: Results are printed directly to stdout
     """
+    
     if not check_env_variables():
         return
     
     if bulk:
-        try:
-            add_bulk_bookmarks(urls=url, note=note, tags=tags, private=private)
-            typer.secho("✅ all bookmarks added successfully!", fg="green")
-        except Exception as e:
-            typer.secho(f"Error adding bulk bookmarks: {e}", fg="red", err=True)
-            raise typer.Exit(code=1) from e
+        add_bulk_bookmarks(urls=url, note=note, tags=tags, private=private)
+        typer.secho("All bookmarks processed successfully!", fg="green")
+        return None
 
-    try:
-        status_code = create_bookmark(
-            url=url, title=title, note=note, tags=tags, private=private, to_read=to_read
-        )
+    fields_dict = create_bookmark(
+        url=url, title=title, note=note, tags=tags, private=private, to_read=to_read
+    )
 
-        if status_code == 200:
-            typer.secho("✅ Bookmark created successfully!", fg="green")
-            typer.echo(f"URL: {url}")
-            if title:
-                typer.echo(f"Title: {title}")
-            if tags:
-                typer.echo(f"Tags: {', '.join(tags)}")
-            if private:
-                typer.echo("Visibility: Private")
-            if to_read:
-                typer.echo("Marked as: To Read")
-        else:
-            typer.secho(f"❌ Error creating bookmark. Status code: {status_code}", fg="red")
-
-    except Exception as e:
-        typer.secho(f"Error creating bookmark: {e}", fg="red", err=True)
-        raise typer.Exit(code=1) from e
-    
+    if not fields_dict.get("status"):
+        typer.secho("✅ Bookmark created successfully!", fg="green")
+        typer.secho(f"Title: {fields_dict.get('description')}", fg="bright_white", bold=True)
+        typer.echo(f"URL: {fields_dict.get('url')}")
+        typer.echo(f"Tags: {fields_dict.get('tags', '').replace('+', ', ')}")  # in http request, tags are seperated by +, so replace + with ', '
+        typer.echo(f"Privacy: {'Private' if fields_dict.get('shared') == 'no' else 'Public'}")
+        typer.echo(f"Read Status: {'To Read' if fields_dict.get('toread') == 'yes' else 'Read'}")
+        if fields_dict.get("extended"):
+            typer.echo(f"Note: {fields_dict.get('extended')}")
+    else:
+        typer.secho(f"Error creating bookmark: {fields_dict.get('status')}", fg="yellow")
+        
 
 def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool):
     """Add multiple bookmarks to your LinkHut account.
@@ -252,9 +246,11 @@ def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool):
     Returns:
         None: Results are printed directly to stdout
     """
+    # todo: add rate limiting
     urls_list: list[str] = parse_bulk_items(content=urls, type="url")
+    typer.echo(f"Found {len(urls_list)} URLs to add:")
     for url in urls_list:
-        add_bookmark(url=url, note=note, tags=tags, private=private)
+        add_bookmark(url=url, title="", note=note, tags=tags, private=private, bulk=False, to_read=to_read)
 
 
 @bookmarks_app.command("update")

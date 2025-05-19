@@ -105,7 +105,13 @@ def create_bookmark(
     Returns:
         int: HTTP status code (200 for success)
     """
-    utils.verify_url(url)
+    try:
+        utils.verify_url(url)
+    except Exception as e:
+        logger.error(f"Invalid URL: {url}. Error: {e}")
+        return {"status": "invalid_url"}
+    
+    
 
     # If title not provided, try to fetch it
     if title is None:
