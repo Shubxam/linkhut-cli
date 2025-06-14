@@ -395,7 +395,7 @@ def delete_bookmark(url: str) -> dict[str, str]:
         return {"bookmark_deletion": "unsuccessful"}
 
 
-def rename_tag(old_tag: str, new_tag: str) -> bool:
+def rename_tag(old_tag: str, new_tag: str) -> dict[str, str]:
     """
     Rename a tag across all bookmarks.
 
@@ -409,17 +409,30 @@ def rename_tag(old_tag: str, new_tag: str) -> bool:
     action = "tag_rename"
     fields = {"old": old_tag, "new": new_tag}
 
-    response: Response = utils.linkhut_api_call(action=action, fields=fields)
+    try:
+        # verify the tag format before making the API call
+        if not old_tag.isalnum() or not new_tag.isalnum():
+            raise ValueError(f"Invalid tag format: {old_tag} or {new_tag}")
+        response: Response = utils.linkhut_api_call(action=action, payload=fields)
+    except ValueError as e:
+        logger.error(f"Invalid tag format: {old_tag} or {new_tag}. Error: {e}")
+        return {"error": "invalid_tag_format"}
+    except Exception as e:
+        logger.error(f"Error renaming tag: {e}")
+        return {"error": "api_error"}
+    
+    result_code: str = response.json().get("result_code", "")
 
-    if response.status_code == 200:
+    if result_code == "done":
         logger.info(f"Tag '{old_tag}' successfully renamed to '{new_tag}'.")
-        return True
+        return {"tag_renaming": "success"}
     else:
-        logger.error(f"Failed to rename tag '{old_tag}' to '{new_tag}'. Status code: {response.status_code}")
-        return False
+        logger.error(f"Failed to rename tag '{old_tag}' to '{new_tag}'. Result code: {result_code}")
+        return {"tag_renaming": "unsuccessful"}
 
 
-def delete_tag(tag: str) -> bool:
+# todo: #20 update error handling for delete_tag, rename_tag
+def delete_tag(tag: str) -> dict[str, str]:
     """
     Delete a tag from all bookmarks.
 
@@ -429,17 +442,29 @@ def delete_tag(tag: str) -> bool:
     Returns:
         Dict[str, Any]: Response from the API
     """
-    action = "tag_delete"
+    action: str = "tag_delete"
     fields: dict[str, str] = {"tag": tag}
 
-    response: Response = utils.linkhut_api_call(action=action, fields=fields)
+    try:
+        # verify the tag format before making the API call
+        if not tag.isalnum():
+            raise ValueError(f"Invalid tag format: {tag}")
+        response: Response = utils.linkhut_api_call(action=action, payload=fields)
+    except ValueError as e:
+        logger.error(f"Invalid tag format: {tag}. Error: {e}")
+        return {"error": "invalid_tag_format"}
+    except Exception as e:
+        logger.error(f"Error deleting tag: {e}")
+        return {"error": "api_error"}
+    
+    result_code: str = response.json().get("result_code", "")
 
-    if response.status_code == 200:
+    if result_code == "done":
         logger.debug(f"Tag '{tag}' successfully deleted.")
-        return True
+        return {"tag_deletion": "success"}
     else:
-        logger.error(f"Failed to delete tag '{tag}'. Tag doesn't exist. Status code: {response.status_code}")
-        return False
+        logger.error(f"Failed to delete tag '{tag}'. Tag doesn't exist. Result code: {result_code}")
+        return {"tag_deletion": "unsuccessful"}
 
 
 # def get_tags() -> List[Dict[str, Any]]:
