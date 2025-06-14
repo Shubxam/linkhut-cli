@@ -487,13 +487,13 @@ if __name__ == "__main__":
     # These examples show how to use the library functions directly
     # Uncomment any of these lines to test the functionality
 
-    # url = "https://huggingface.co/blog/gradio-mcp"
+    url = "https://huggingface.co"
     # title = "Example Title"
     # note = "This is a note."
     # tags = ["tag1", "tag2"]
 
     # 1. Create a new bookmark
-    # create_bookmark(url=url)
+    create_bookmark(url=url)
 
     # 2. Mark a bookmark as to-read
     # reading_list_toggle(url, to_read=True, tags=['MCP'])
@@ -505,7 +505,7 @@ if __name__ == "__main__":
     # delete_bookmark(url)
 
     # 5. List bookmarks with a specific tag
-    print(get_bookmarks(tag=["blog"]))
+    # print(get_bookmarks(tag=["blog"]))
 
     # 6. Show reading list
     # get_reading_list(count=5)
