@@ -91,13 +91,13 @@ def make_get_request(url: str, header: dict[str, str]) -> httpx.Response:
         raise RuntimeError(f"An unexpected error occurred: {e}") from e
     
 
-def linkhut_api_call(action: str, fields: dict[str, str] | None) -> httpx.Response:
+def linkhut_api_call(action: str, payload: dict[str, str]) -> httpx.Response:
     """
     Make an API call to the specified LinkHut endpoint and return the response.
 
     Args:
         action (str): The API action to perform (e.g., "bookmark_create")
-        fields (dict[str, str], optional): Query parameters for the request
+        payload (dict[str, str], optional): Query parameters for the request
 
     Returns:
         Response: The response object from the API
@@ -107,14 +107,14 @@ def linkhut_api_call(action: str, fields: dict[str, str] | None) -> httpx.Respon
     url: str = LINKHUT_BASEURL + LINKHUT_API_ENDPOINTS[action]
 
     # Add query parameters if provided
-    if fields:
+    if payload:
         url += "?"
-        params = []
-        for key, value in fields.items():
+        params: list[str] = []
+        for key, value in payload.items():
             params.append(f"{key}={value}")
         url += "&".join(params)
 
-    header = get_request_headers(site="LinkHut")
+    header: dict[str, str] = get_request_headers(site="LinkHut")
     logger.debug(f"making request to {url} with header {header}")
     response: httpx.Response = make_get_request(url=url, header=header)
     return response
@@ -131,25 +131,25 @@ def get_link_title(dest_url: str) -> str:
             
     Note: returns url as title if the request fails.
     """
-    # verify_url(url)
+    # verify_url(url) # todo
     title: str
     dest_url_str: str = f"q={dest_url}"
 
-    # fetch the following fields: title, description, url (disabling, as it doesn't work)
+    # fetch the following fields: title, description, url (disabling, as setting custom fields is supported but doesnt work with the API)
     # fields_str = "fields=title,description,url"
     
     # allow websites with blocked content
     block_content: str = "block_content=false"
     
     api_endpoint: str = f"/?{block_content}&{dest_url_str}"
-    api_url: str = LINKPREVIEW_BASEURL + api_endpoint
+    request_url: str = LINKPREVIEW_BASEURL + api_endpoint
 
-    logger.debug(f"making request to get title : {api_url}")
+    logger.debug(f"making request to get title : {request_url}")
 
     header: dict[str, str] = get_request_headers("LinkPreview")
 
     try:
-        response: httpx.Response = make_get_request(url=api_url, header=header)
+        response: httpx.Response = make_get_request(url=request_url, header=header)
         title_str: str = response.json().get("title", "")
         title = title_str if title_str else dest_url
     except Exception as e:
@@ -172,15 +172,16 @@ def get_tags_suggestion(dest_url: str) -> str:
     Note: returns "AutoTagFetchFailed" if the request fails or no suggested tags found.
     """
     action: str = "tag_suggest"
-    fields: dict[str, str] = {
+    payload: dict[str, str] = {
         "url": dest_url,
     }
 
     logger.debug(f"fetching suggested tags for : {dest_url}")
 
     try:
-        response: httpx.Response = linkhut_api_call(action=action, fields=fields)
-        # above call will always return a response (200)
+        response: httpx.Response = linkhut_api_call(action=action, payload=payload)
+        # above call will always return a response (200) except in case of network error or API down.
+        # if no tags are found, it will return an empty dict.
 
         status_code: int = response.status_code
         response_dict: list[dict[str, list[str]]] = response.json()
