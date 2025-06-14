@@ -1,5 +1,7 @@
-# todo: make the order of the return types of functions with api calls consistent. i.e. all the functions which call make_get_request should use `return response.json(), response.status_code`
+# note: make the order of the return types of functions with api calls consistent.
+# i.e. all the functions which call make_get_request should use `return response.json(), response.status_code`
 
+import json
 import os
 import re
 import sys
@@ -74,9 +76,7 @@ def make_get_request(url: str, header: dict[str, str]) -> httpx.Response:
     try:
         logger.debug(f"making get request to following url: {url}")
         response = httpx.get(url=url, headers=header)
-        logger.debug(
-            f"response is {response.json()} with status code {response.status_code}"  # todo: prettify json output
-        )
+        logger.debug(f"response is {json.dumps(response.json(), indent=2)} with status code {response.status_code}")
         return response  # Ensure a response is always returned
 
     except httpx.HTTPStatusError as exc:
