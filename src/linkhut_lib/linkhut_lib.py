@@ -106,7 +106,7 @@ def create_bookmark(
     url: str,
     title: str = "",
     note: str = "",
-    tags: str = "",  # could be of any form: "tag1,tag2" or "tag1 tag2" or "tag1 tag2,tag3" or "tag1, tag2, tag3"
+    tags: str = "",  # could be of form: "tag1,tag2" or "tag1 tag2" or "tag1 tag2,tag3" 
     fetch_tags: bool = True,
     private: bool = False,
     to_read: bool = False,
@@ -133,6 +133,7 @@ def create_bookmark(
         dict[str, str]: The created bookmark's metadata
     """
     try:
+        # must start with http:// or https://
         utils.verify_url(url)
     except Exception as e:
         logger.error(f"Invalid URL: {url}. Error: {e}")
@@ -144,11 +145,13 @@ def create_bookmark(
     if not title:        
         title = utils.get_link_title(url)
 
-    # If tags not provided, try to fetch suggestions
-    if not tags and fetch_tags:
-        tags = utils.get_tags_suggestion(url)  # comma separated tags
+    # If valid tags not provided, try to fetch suggestions
+    if not tags.isalnum() and fetch_tags:
+        tags_str: str = utils.get_tags_suggestion(url)  # comma separated tags
+        tags = tags_str.replace(",", " ").replace(" ", "+")  # convert to + separated tags
 
-    if tags:
+    # checks if tag string in argument is not just a whitespace or empty string
+    elif tags.isalnum():  
         _tag_list: list[str] = tags.replace(",", " ").split()
         tags = "+".join(_tag_list)
 
@@ -165,7 +168,7 @@ def create_bookmark(
         fields["extended"] = note
 
     try:
-        response: Response = utils.linkhut_api_call(action=action, fields=fields)
+        response: Response = utils.linkhut_api_call(action=action, payload=fields)
         response_dict: dict[str, str] = response.json()
         status_code: int = response.status_code
         if status_code == 200 and response_dict.get("result_code") == "done":
