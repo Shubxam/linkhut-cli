@@ -24,7 +24,7 @@ def get_bookmarks(
     date: str = "",
     url: str = "",
     count: int | None = None,
-) -> list[dict]:
+) -> list[dict[str, str]]:
     """
     Get bookmarks from LinkHut. Supports filtering or fetching by recent count.
 
@@ -43,14 +43,15 @@ def get_bookmarks(
     Returns:
         list[dict]: list of dictionaries containing bookmark metadata.
     """
-    fields: dict[str, str | int] = {}
+    fields: dict[str, str] = {}
     action: str
 
     if count is not None:
         action = "bookmark_recent"
-        fields["count"] = count
+        fields["count"] = str(count)  # if count is 0, then returns 15
         if tag:
-            # bookmark_recent accept only one tag
+            # bookmark_recent accept only one tag, if multiple tags are provided, then only the first one is used
+            # if presented with wrong tag, it returns {"posts": []}
             fields["tag"] = tag.replace(",", " ").split()[0]
             logger.debug(f"Using first tag for /recent endpoint: {fields['tag']}")
     elif tag or date or url:
@@ -59,33 +60,46 @@ def get_bookmarks(
             # bookmark_get expects tags=tag1+tag2...
             fields["tag"] = tag.replace(" ", "+").replace(",", "+")
         if date:
-            # bookmark_get takes dt=CCYY-MM-DDThh:mm:ssZ
-            # TODO: Add validation/formatting for CCYY-MM-DDThh:mm:ssZ
-            fields["dt"] = date  
+            try:
+                # bookmark_get takes dt=CCYY-MM-DD
+                utils.is_valid_date(date)  # validate date format
+            except ValueError as e:
+                logger.error(f"Invalid date format for {date}: {e}")
+                return [{"error": "invalid_date_format"}]
+            fields["dt"] = date
         if url:
-            # utils.verify_url(url)
-            # TODO: Add URL encoding if necessary utils.encode_url(url)
+            try:
+                # TODO: Add URL encoding if necessary utils.encode_url(url)
+                utils.verify_url(url)
+            except ValueError as e:
+                logger.error(f"Invalid URL format for {url}: {e}")
+                return [{"error": "invalid_url_format"}]
             fields["url"] = url
     else:
         # Default behavior: get recent 15 posts
         action = "bookmark_recent"
-        fields["count"] = 15
+        fields["count"] = "15"
 
     try:
         response: Response = utils.linkhut_api_call(
-            action=action, fields=fields if fields else None  # type: ignore
+            action=action, payload=fields
         )
-        response_dict: list[dict[str, str | int]] = response.json()["posts"]
-        status_code: int = response.status_code
-        if status_code == 200 and len(response_dict) > 0:
+        fetched_bookmarks: list[dict[str, str]] = response.json().get("posts", [])
+
+        # if bookmarks are found, posts list will not be empty
+        if fetched_bookmarks:
             logger.debug("Bookmarks fetched successfully")
-            return response_dict
-        else:
+            return fetched_bookmarks
+        elif response.json().get("result_code") == "something went wrong" or not fetched_bookmarks:
+            # result code "something went wrong" indicates posts/get endpoint was called with wrong url
             logger.error("No Bookmarks Found")
-            return []
+            return [{"error": "no_bookmarks_found"}]
+        else:
+            logger.warning("No bookmarks found for the given criteria")
+            return [{"error": "unknown_error"}]
     except Exception as e:
         logger.error(f"Error fetching bookmarks: {e}")
-        return []
+        return [{"error": "error_fetching_bookmarks"}]
 
 
 def create_bookmark(
