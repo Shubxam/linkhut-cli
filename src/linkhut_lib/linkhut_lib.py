@@ -339,7 +339,7 @@ def update_bookmark(
             return {"error": "unknown_error"}
 
 
-def get_reading_list(count: int = 5):
+def get_reading_list(count: int = 5) -> list[dict[str, str]]:
     """
     Fetch and display the user's reading list (bookmarks marked as to-read).
 
@@ -349,13 +349,19 @@ def get_reading_list(count: int = 5):
     Returns:
         None: Results are printed directly to stdout
     """
-    reading_list = get_bookmarks(tag="unread", count=count)
-    if reading_list:
+    reading_list: list[dict[str, str]] = get_bookmarks(tag="unread", count=count)
+    if reading_list[0].get("error"):
+        logger.error("No bookmarks found in the reading list.")
+        return [{"error": "no_bookmarks_found"}]
+    elif reading_list:
         logger.debug(f"Reading list fetched successfully: {reading_list}")
         return reading_list
+    else:
+        logger.error("No bookmarks found in the reading list.")
+        return [{"error": "no_bookmarks_found"}]
 
 
-def delete_bookmark(url: str) -> bool:
+def delete_bookmark(url: str) -> dict[str, str]:
     """
     Delete a bookmark.
 
@@ -365,17 +371,28 @@ def delete_bookmark(url: str) -> bool:
     Returns:
         Dict[str, Any]: Response from the API
     """
-    action = "bookmark_delete"
-    fields = {"url": url}
+    action: str = "bookmark_delete"
+    fields: dict[str, str] = {"url": url}
 
-    response: Response = utils.linkhut_api_call(action=action, fields=fields)
+    try:
+        # verify the URL format before making the API call
+        utils.verify_url(url)
+        response: Response = utils.linkhut_api_call(action=action, payload=fields)
+    except ValueError as e:
+        logger.error(f"Invalid URL format: {url}. Error: {e}")
+        return {"error": "invalid_url_format"}
+    except Exception as e:
+        logger.error(f"Error deleting bookmark: {e}")
+        return {"error": "api_error"}
+    
+    result_code: str = response.json().get("result_code", "")
 
-    if response.status_code == 200:
+    if result_code == "done":
         logger.debug(f"Bookmark with URL {url} successfully deleted.")
-        return True
+        return {"bookmark_deletion": "success"}
     else:
-        logger.error(f"No bookmark with URL {url} exists. Status code: {response.status_code}")
-        return False
+        logger.error(f"Unable to delete bookmark with URL {url}. Result code: {result_code}")
+        return {"bookmark_deletion": "unsuccessful"}
 
 
 def rename_tag(old_tag: str, new_tag: str) -> bool:
