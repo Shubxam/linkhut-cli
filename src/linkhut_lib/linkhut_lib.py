@@ -1,4 +1,5 @@
-"""LinkHut Library - Core functions for interacting with LinkHut API.
+"""
+LinkHut Library - Core functions for interacting with LinkHut API.
 
 This module provides functions for managing bookmarks and tags through the LinkHut API,
 including creating, updating, listing and deleting bookmarks, as well as managing tags.
@@ -14,7 +15,7 @@ from . import utils
 logger.remove()
 logger.add(
     sys.stderr,
-    level="INFO",
+    level="DEBUG",
     format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
 )
 
