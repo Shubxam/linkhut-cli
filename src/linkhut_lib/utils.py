@@ -230,11 +230,10 @@ def verify_url(url: str) -> bool:
     Returns:
         bool: True if the URL is valid, False otherwise.
     """
-    # Check if the URL starts with a valid scheme
-    if not re.match(r"^(http|https)://", url):
+    # todo: make url validation better, also check for pattern *://*.*
+    if not url.startswith(("http://", "https://")):
         raise ValueError("Invalid URL: must start with http:// or https://")
-
-    if len(url) > 2048:
+    elif len(url) > 2048:
         raise ValueError("Invalid URL: length exceeds 2048 characters")
 
     return True
