@@ -240,10 +240,30 @@ def verify_url(url: str) -> bool:
     return True
 
 
+def is_valid_date(date_str: str) -> bool:
+    """
+    Check if the given string is a valid date in YYYY-MM-DD format.
+    
+    Args:
+        date_str (str): The date string to validate.
+        
+    Returns:
+        bool: True if the date is valid, False otherwise.
+
+    Raises:
+        ValueError: If the date format is invalid.
+    """
+    date_pattern = r"^\d{4}-\d{2}-\d{2}$"
+    result = bool(re.match(date_pattern, date_str))
+    if not result:
+        raise ValueError(f"Invalid date format: {date_str}. Expected format is YYYY-MM-DD.")
+    return result
+
+
 if __name__ == "__main__":
     # Example usage
     dest_url = "http://news.ycombinator.com"
-    dest_url_base = dest_url.split("?")[0]
+    # dest_url_base = dest_url.split("?")[0]
 
     # print(f"Title info: {get_link_title(dest_url)}")
     # print(f"Tags suggestion: {get_tags_suggestion(dest_url_base)}")
