@@ -453,7 +453,7 @@ def show_reading_list(
 ):
     """Display your reading list.
 
-    Shows a list of bookmarks marked as 'to-read' in a clean format.
+    Shows a list of bookmarks with tag #unread.
     This command makes it easy to view your reading queue at a glance.
 
     Examples:
@@ -467,26 +467,25 @@ def show_reading_list(
         return
 
     try:
-        reading_list = get_reading_list(count=count)
+        reading_list: list[dict[str, str]] = get_reading_list(count=count)
 
-        if not reading_list or not reading_list.get("posts"):
+        if reading_list[0].get("error") == "no_bookmarks_found":
             typer.echo("Your reading list is empty.")
             return
+        elif reading_list[0].get("error") == "api_error":
+            typer.secho("Error fetching reading list. Something went wrong with the API.", fg="red")
+            return
 
-        posts = reading_list.get("posts", [])
-
-        for i, bookmark in enumerate(posts, 1):
-            title: str = bookmark.get("description", "No title")
+        for i, bookmark in enumerate(reading_list, 1):
+            title: str = bookmark.get("description", "No title available")
             url: str = bookmark.get("href", "")
-            tags: list[str | None] = (
-                bookmark.get("tags", "").split(",") if bookmark.get("tags") else []
-            )
+            tags: list[str] = bookmark.get("tags", "").split(" ")
             note: str = bookmark.get("extended", "")
 
             typer.secho(f"{i}. {title}", fg="bright_white", bold=True)
             typer.echo(f"   URL: {url}")
 
-            if tags and tags[0]:  # Check if tags exist and aren't empty
+            if tags:  # Check if tags exist and aren't empty
                 tag_str: str = ", ".join(tags)
                 typer.echo(f"   Tags: {tag_str}")
 
