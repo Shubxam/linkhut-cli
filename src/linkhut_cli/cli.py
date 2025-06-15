@@ -314,62 +314,50 @@ def delete_bookmark_cmd(
     if not check_env_variables():
         return
 
-    try:
-        # First fetch the bookmark details to show the user what they're deleting
-        bookmark_dict, status_code = get_bookmarks(url=url)
+    # First fetch the bookmark details to show the user what they're deleting
+    bookmark: dict[str, str] = get_bookmarks(url=url)[0]
 
-        if status_code != 200:
-            typer.secho(f"❌ Bookmark with URL '{url}' not found.", fg="red")
+    if bookmark.get("error") == "no_bookmarks_found":
+        typer.secho(f"❌ Bookmark with URL '{url}' not found.", fg="red")
+        return
+    elif bookmark.get("error"):
+        typer.secho("❌ Error fetching bookmark details. Issue with network or API.", fg="red")
+        return
+
+    # Display bookmark details
+    typer.secho("\nBookmark Details:", fg="bright_blue", bold=True)
+
+    title = bookmark.get("description", "No title")
+    bookmark_url = bookmark.get("href", "No URL found")
+    tags_str = bookmark.get("tags", "").replace(" ", ", ")
+    is_private = bookmark.get("shared") == "no"
+    to_read = bookmark.get("toread") == "yes"
+    note = bookmark.get("extended", "")
+
+    typer.secho(f"Title: {title}", fg="bright_white", bold=True)
+    typer.echo(f"URL: {bookmark_url}")
+    typer.echo(f"Tags: {tags_str}")
+    typer.echo(f"Privacy: {'Private' if is_private else 'Public'}")
+    typer.echo(f"Read Status: {'To Read' if to_read else 'Read'}")
+
+    if note:
+        typer.echo(f"Note: {note}")
+
+    typer.echo("")  # Empty line for spacing
+
+    # Ask for confirmation unless force flag is set
+    if not force:
+        confirmed = typer.confirm("Are you sure you want to delete this bookmark?")
+        if not confirmed:
+            typer.echo("Operation cancelled.")
             return
 
-        # Extract bookmark details
-        bookmark: list[dict[str, str]] | None = (
-            bookmark_dict.get("posts")[0] if bookmark_dict.get("posts") else None
-        )  # pyright: ignore
+    result = delete_bookmark(url=url)
 
-        if not bookmark:
-            typer.secho(f"❌ Bookmark with URL '{url}' not found.", fg="red")
-            return
-
-        # Display bookmark details
-        typer.secho("\nBookmark Details:", fg="bright_blue", bold=True)
-
-        title = bookmark.get("description", "No title")
-        bookmark_url = bookmark.get("href", "")
-        tags = bookmark.get("tags", "").split(",") if bookmark.get("tags") else []
-        tags_str = ", ".join(tags) if tags and tags[0] else "None"
-        is_private = bookmark.get("shared") == "no"
-        to_read = bookmark.get("toread") == "yes"
-        note = bookmark.get("extended", "")
-
-        typer.secho(f"Title: {title}", fg="bright_white", bold=True)
-        typer.echo(f"URL: {bookmark_url}")
-        typer.echo(f"Tags: {tags_str}")
-        typer.echo(f"Privacy: {'Private' if is_private else 'Public'}")
-        typer.echo(f"Read Status: {'To Read' if to_read else 'Read'}")
-
-        if note:
-            typer.echo(f"Note: {note}")
-
-        typer.echo("")  # Empty line for spacing
-
-        # Ask for confirmation unless force flag is set
-        if not force:
-            confirmed = typer.confirm("Are you sure you want to delete this bookmark?")
-            if not confirmed:
-                typer.echo("Operation cancelled.")
-                return
-
-        success = delete_bookmark(url=url)
-
-        if success:
-            typer.secho("✅ Bookmark deleted successfully!", fg="green")
-        else:
-            typer.secho("❌ Failed to delete bookmark.", fg="red")
-
-    except Exception as e:
-        typer.secho(f"Error deleting bookmark: {e}", fg="red", err=True)
-        raise typer.Exit(code=1) from e
+    if result.get("bookmark_deletion") == "success":
+        typer.secho("✅ Bookmark deleted successfully!", fg="green")
+    else:
+        typer.secho("❌ Failed to delete bookmark.", fg="red")
 
 
 # Tag commands
