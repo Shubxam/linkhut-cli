@@ -5,6 +5,7 @@ This module provides functions for managing bookmarks and tags through the LinkH
 including creating, updating, listing and deleting bookmarks, as well as managing tags.
 """
 
+import json
 import sys
 
 from httpx import Response
@@ -15,7 +16,7 @@ from . import utils
 logger.remove()
 logger.add(
     sys.stderr,
-    level="DEBUG",
+    level="INFO",
     format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
 )
 
