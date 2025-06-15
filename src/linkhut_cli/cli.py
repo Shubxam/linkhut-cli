@@ -437,7 +437,7 @@ def delete_tag_cmd(
         raise typer.Exit(code=1) from e
 
 
-# Add top-level commands for reading list and toggle-read
+# todo: update the output format for reading list command
 @app.command("reading-list")
 def show_reading_list(
     count: int = typer.Option(5, "--count", "-c", help="Number of bookmarks to show"),
@@ -472,9 +472,11 @@ def show_reading_list(
             url: str = bookmark.get("href", "")
             tags: list[str] = bookmark.get("tags", "").split(" ")
             note: str = bookmark.get("extended", "")
+            private: bool = bookmark.get("shared") == "no"
 
             typer.secho(f"{i}. {title}", fg="bright_white", bold=True)
             typer.echo(f"   URL: {url}")
+            typer.echo(f"   Private: {'Yes' if private else 'No'}")
 
             if tags:  # Check if tags exist and aren't empty
                 tag_str: str = ", ".join(tags)
