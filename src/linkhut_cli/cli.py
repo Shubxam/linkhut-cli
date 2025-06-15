@@ -101,86 +101,89 @@ def config_status():
 
 
 # Bookmark commands
-@bookmarks_app.command("list")
+@bookmarks_app.command("get")
 def list_bookmarks(
-    tag: list[str] | None = typer.Option(
-        None, "--tag", "-t", help="Filter by tags, will only take 1 tag is count is set"
+    tag: str = typer.Option(
+        "", "--tag", "-g", help="Filter by one tag or multiple tags (comma-separated or space-separated inside quotes)"
     ),
-    count: int | None = typer.Option(None, "--count", "-c", help="Number of bookmarks to show"),
-    date: str | None = typer.Option(
-        None, "--date", "-d", help="Date to filter bookmarks(in YYYY-MM-DD format)"
+    count: int = typer.Option(0, "--count", "-c", help="Number most recent bookmarks to show, can also be used with one tag"),
+    date: str = typer.Option(
+        "", "--date", "-d", help="Date to filter bookmarks(in YYYY-MM-DD format)"
     ),
-    url: str | None = typer.Option(None, "--url", "-u", help="URL to filter bookmarks"),
+    url: str = typer.Option("", "--url", "-u", help="URL to filter bookmarks"),
 ):
-    """List bookmarks from your LinkHut account.
+    """Get bookmarks from your LinkHut account.
 
-    This command retrieves and displays bookmarks from your LinkHut account.
+    This command retrieves and displays bookmarks from your LinkHut account.\n
     You can filter the results by tags, date, or specific URL, and limit the
     number of results returned.
 
     If count is provided, it fetches the most recent 'count' bookmarks.
     If other filters are applied without count, it uses the filtering API.
     Without any arguments, it returns the 15 most recent bookmarks.
-
-    Returns:
-        None: Results are printed directly to stdout
     """
     if not check_env_variables():
         return
 
-    params = {}
+    params: dict[str, str | int] = {}
 
-    try:
-        if count:
-            params["count"] = count
-            if tag:
-                params["tag"] = [tag[0]]
+    if count:
+        params["count"] = count
+        if tag:
+            # Only take the first tag
+            # tags_list = parse_bulk_items(content=tag, type="tag")
+            tags = sanitize_tags(tag)
+            params["tag"] = tags
+            if len(tags.split()) > 1:
+                typer.echo(f"Multiple tags detected, only the first tag: {tags.split()[0]} will be used.")
 
-        elif tag or date or url:
-            params["tag"] = tag
+    elif tag or date or url:
+        # whitespace or comma separated string
+        if tag:
+            params["tag"] = sanitize_tags(tag)
+
+        if date:
             params["date"] = date
+
+        if url:
             params["url"] = url
 
-        else:
-            params["count"] = 15
+    fetched_bookmarks: list[dict[str, str]] = get_bookmarks(**params)
 
-        result, status_code = get_bookmarks(**params)  # pyright: ignore
+    if fetched_bookmarks[0].get("error") == "invalid_date_format":  # dateformat error
+        typer.echo("Invalid date format. Please use YYYY-MM-DD format.")
+        return
+    elif fetched_bookmarks[0].get("error") == "invalid_url_format":  # url format error
+        typer.echo("Invalid URL format. Please provide a valid URL.")
+        return
+    elif fetched_bookmarks[0].get("error") == "no_bookmarks_found":  # no bookmarks found
+        typer.echo("No bookmarks found with the given filters.")
+        return
+    elif fetched_bookmarks[0].get("error"):
+        typer.echo("An error occurred while fetching bookmarks. Issue with network or API.")
+        return
 
-        if status_code != 200 or not result or not result.get("posts"):
-            typer.echo("No bookmarks found.")
-            return
+    typer.echo(f"Found {len(fetched_bookmarks)} bookmarks:")
 
-        posts = result.get("posts", [])
-        typer.echo(f"Found {len(posts)} bookmarks:")
+    for i, bookmark in enumerate(fetched_bookmarks, 1):
 
-        for i, bookmark in enumerate(posts, 1):
-            title: str = bookmark.get("description", "No title")
-            url = bookmark.get("href", "")
-            tags = bookmark.get("tags", "").split(",") if bookmark.get("tags") else []
-            is_private = bookmark.get("shared") == "no"
-            to_read = bookmark.get("toread") == "yes"
+        title: str = bookmark.get("description", "No title available")
+        href: str = bookmark.get("href", "No URL")
+        tags: str = bookmark.get("tags", "").replace(" ", ", ")
+        is_private: bool = bookmark.get("shared") == "no"
+        to_read: bool = bookmark.get("toread") == "yes"
 
-            # Format output with color and indicators
-            title_color = "bright_white" if to_read else "white"
-            privacy = "[Private]" if is_private else ""
-            read_status = "[To Read]" if to_read else ""
+        # Format output with color and indicators
+        title_color: str = "bright_white" if to_read else "white"
+        privacy: str = "[private]" if is_private else "[public]"
+        read_status: str = "[unread]" if to_read else ""
+        status_text: str = f"{privacy} {read_status}"
 
-            typer.secho(f"{i}. {title}", fg=title_color, bold=to_read)
-            typer.echo(f"   URL: {url}")
-
-            if tags and tags[0]:  # Check if tags exist and aren't empty
-                tag_str = ", ".join(tags)
-                typer.echo(f"   Tags: {tag_str}")
-
-            if privacy or read_status:
-                status_text = f"   Status: {privacy} {read_status}".strip()
-                typer.echo(status_text)
-
-            typer.echo("")  # Empty line between bookmarks
-
-    except Exception as e:
-        typer.secho(f"Error fetching bookmarks: {e}", fg="red", err=True)
-        raise typer.Exit(code=1) from e
+        typer.secho(f"{i}. {title}", fg=title_color, bold=to_read)
+        typer.secho(f"   URL: {href}", fg="blue")
+        typer.secho(f"   Tags: {tags}", fg="cyan")
+        typer.secho(f"   Status: {status_text}", fg="yellow")
+        typer.echo("")  # Empty line between bookmarks
 
 
 @bookmarks_app.command("add")
