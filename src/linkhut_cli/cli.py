@@ -194,18 +194,15 @@ def add_bookmark(
     note: str = typer.Option("", "--note", "-n", help="Note for the bookmark"),
     tags: str = typer.Option("", "--tag", "-g", help="Tags to associate with the bookmark"),
     private: bool = typer.Option(False, "--private", "-p", help="Make the bookmark private"),
-    to_read: bool = typer.Option(False, "--to-read", "-r", help="Mark as to-read"),
+    to_read: bool = typer.Option(False, "--to-read", "-r", help="Add to reading list"),
 ) -> None:
     """Add a new bookmark to your LinkHut account.
 
     This command creates a new bookmark with the specified URL and optional metadata.
-    If a title is not provided, it will attempt to fetch it automatically from the page.
+    If a title is not provided, it will attempt to fetch it automatically.
     If tags are not provided, it will attempt to suggest tags based on the content.
 
     The bookmark can be marked as private or public, and can be added to your reading list.
-
-    Returns:
-        None: Results are printed directly to stdout
     """
     
     if not check_env_variables():
@@ -214,23 +211,33 @@ def add_bookmark(
     if bulk:
         add_bulk_bookmarks(urls=url, note=note, tags=tags, private=private)
         typer.secho("All bookmarks processed successfully!", fg="green")
-        return None
+        return
 
-    fields_dict = create_bookmark(
+    fields_dict: dict[str, str] = create_bookmark(
         url=url, title=title, note=note, tags=tags, private=private, to_read=to_read
     )
 
-    if not fields_dict.get("status"):
+    if fields_dict.get("error") == "invalid_url":
+        typer.secho(f"❌ Invalid URL: {fields_dict.get('url')}", fg="red")
+        typer.secho("Please provide a valid URL starting with http:// or https://", fg="red")
+        return
+    
+    elif fields_dict.get("error") == "bookmark_exists":
+        typer.secho(f"❌ Bookmark with URL '{fields_dict.get('url')}' already exists.", fg="yellow")
+        return
+    
+    elif fields_dict.get("error"):
+        typer.secho("❌ Error creating bookmark: API/network issue.", fg="red")
+        return
+    else:
         typer.secho("✅ Bookmark created successfully!", fg="green")
         typer.secho(f"Title: {fields_dict.get('description')}", fg="bright_white", bold=True)
         typer.echo(f"URL: {fields_dict.get('url')}")
-        typer.echo(f"Tags: {fields_dict.get('tags', '').replace('+', ', ')}")  # in http request, tags are seperated by +, so replace + with ', '
+        typer.echo(f"Tags: {fields_dict.get('tags', '').replace('+', ', ')}")  # while sending http request, tags are seperated by +, so replace + with ', '
         typer.echo(f"Privacy: {'Private' if fields_dict.get('shared') == 'no' else 'Public'}")
         typer.echo(f"Read Status: {'To Read' if fields_dict.get('toread') == 'yes' else 'Read'}")
         if fields_dict.get("extended"):
             typer.echo(f"Note: {fields_dict.get('extended')}")
-    else:
-        typer.secho(f"Error creating bookmark: {fields_dict.get('status')}", fg="yellow")
         
 
 def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool, to_read: bool = False) -> None:
