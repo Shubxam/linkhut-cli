@@ -277,7 +277,7 @@ def update_bookmark_cmd(
     url: str = typer.Argument(..., help="URL of the bookmark to update"),
     tags: str = typer.Option("", "--tag", "-g", help="New tags for the bookmark"),
     note: str = typer.Option("", "--note", "-n", help="Note to append to the bookmark"),
-    private: bool = typer.Option(False, "--private/--public", help="Update bookmark privacy"),
+    private: bool | None = typer.Option(None, "--private/--public", help="Update bookmark privacy"),
     replace: bool = typer.Option(False, "--replace", "-R", help="Replace existing bookmark with the same URL. Default is False which appends the new tags and note to the existing bookmark"),
 ):
     """Update an existing bookmark in your LinkHut account.
@@ -290,9 +290,7 @@ def update_bookmark_cmd(
     if not check_env_variables():
         return
 
-    private_str: str = "yes" if private else "no"
-    tags_str: str = tags
-    result: dict[str, str] = update_bookmark(url=url, new_tag=tags_str, new_note=note or "", new_private=private_str, replace=replace)
+    result: dict[str, str] = update_bookmark(url=url, new_tag=tags, new_note=note, new_private=private, replace=replace)
 
     if result.get("status") == "missing_update_parameters":
         typer.secho("No update parameters provided. Please specify at least one parameter to update.", fg="red")
