@@ -42,6 +42,7 @@ dependencies = [
     "dotenv>=0.9.9",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
+    "tqdm>=4.67.1",
     "typer>=0.15.3",
 ]
 
