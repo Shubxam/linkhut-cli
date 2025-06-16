@@ -1,8 +1,7 @@
 import re
-from typing import Literal
 
 
-def parse_bulk_items(content: str, type: Literal["url", "tag"]) -> list[str]:
+def parse_bulk_items(content: str) -> list[str]:
     """
     Parse a string of items(URLs, tags) separated by newlines, commas, whitespace into a list of items.
     Args:
@@ -11,7 +10,16 @@ def parse_bulk_items(content: str, type: Literal["url", "tag"]) -> list[str]:
     Returns:
         list[str]: A list of items.
     """
-    if type == "url":
-        return [item.strip() for item in re.split(r"[,\n]+", content) if item.strip()]
-    elif type == "tag":
-        return [item.strip() for item in re.split(r"[,\s]+", content) if item.strip()]
+    return [item.strip() for item in re.split(r"[,\n]+", content) if item.strip()]
+
+
+def parse_linkhut_bookmarks(response: list[dict[str, str]]):
+    """
+    Parse a list of dictionaries containing linkhut bookmarks.
+    """
+    pass
+
+
+def sanitize_tags(tag_string: str) -> str:
+    tag_string = tag_string.strip().replace(",", " ")
+    return tag_string
