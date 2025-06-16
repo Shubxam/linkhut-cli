@@ -24,7 +24,7 @@ LINKHUT_API_ENDPOINTS: dict[str, str] = {
     "bookmark_delete": "/v1/posts/delete",
     "tag_suggest": "/v1/posts/suggest",
     "tag_delete": "/v1/tags/delete",
-    "tag_rename": "/v1/tags/rename"
+    "tag_rename": "/v1/tags/rename",
 }
 
 

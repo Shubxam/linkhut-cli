@@ -76,7 +76,9 @@ def make_get_request(url: str, header: dict[str, str]) -> httpx.Response:
     try:
         logger.debug(f"making get request to following url: {url}")
         response = httpx.get(url=url, headers=header)
-        logger.debug(f"response is {json.dumps(response.json(), indent=2)} with status code {response.status_code}")
+        logger.debug(
+            f"response is {json.dumps(response.json(), indent=2)} with status code {response.status_code}"
+        )
         return response  # Ensure a response is always returned
 
     except httpx.HTTPStatusError as exc:
@@ -89,7 +91,7 @@ def make_get_request(url: str, header: dict[str, str]) -> httpx.Response:
         ) from exc
     except Exception as e:
         raise RuntimeError(f"An unexpected error occurred: {e}") from e
-    
+
 
 def linkhut_api_call(action: str, payload: dict[str, str]) -> httpx.Response:
     """
@@ -128,7 +130,7 @@ def get_link_title(dest_url: str) -> str:
 
     Returns:
         - str: The title of the link.
-            
+
     Note: returns url as title if the request fails.
     """
     # verify_url(url) # todo
@@ -137,10 +139,10 @@ def get_link_title(dest_url: str) -> str:
 
     # fetch the following fields: title, description, url (disabling, as setting custom fields is supported but doesnt work with the API)
     # fields_str = "fields=title,description,url"
-    
+
     # allow websites with blocked content
     block_content: str = "block_content=false"
-    
+
     api_endpoint: str = f"/?{block_content}&{dest_url_str}"
     request_url: str = LINKPREVIEW_BASEURL + api_endpoint
 
@@ -196,7 +198,7 @@ def get_tags_suggestion(dest_url: str) -> str:
         else:
             logger.warning("Issue with the API. Auto Tag Fetch Failed.")
             return "AutoTagFetchFailed"
-        
+
     except Exception as e:
         # if there is a network error or the API is down, we handle that in the following exception.
         logger.error(f"Error fetching tags for {dest_url}: {e}")
@@ -243,10 +245,10 @@ def verify_url(url: str) -> bool:
 def is_valid_date(date_str: str) -> bool:
     """
     Check if the given string is a valid date in YYYY-MM-DD format.
-    
+
     Args:
         date_str (str): The date string to validate.
-        
+
     Returns:
         bool: True if the date is valid, False otherwise.
 

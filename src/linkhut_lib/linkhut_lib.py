@@ -51,9 +51,9 @@ def get_bookmarks(
     action: str
 
     # Determine action based on provided parameters
-    if count: 
+    if count:
         action = "bookmark_recent"
-        fields["count"] = str(count) 
+        fields["count"] = str(count)
         if tag:
             # bookmark_recent accept only one tag, if multiple tags are provided, then only the first one is used
             # if presented with wrong tag, it returns {"posts": []}
@@ -87,9 +87,7 @@ def get_bookmarks(
         fields["count"] = "15"
 
     try:
-        response: Response = utils.linkhut_api_call(
-            action=action, payload=fields
-        )
+        response: Response = utils.linkhut_api_call(action=action, payload=fields)
         fetched_bookmarks: list[dict[str, str]] = response.json().get("posts", [])
 
         # if bookmarks are found, posts list will not be empty
@@ -113,7 +111,7 @@ def create_bookmark(
     url: str,
     title: str = "",
     note: str = "",
-    tags: str = "",  # could be of form: "tag1,tag2" or "tag1 tag2" or "tag1 tag2,tag3" 
+    tags: str = "",  # could be of form: "tag1,tag2" or "tag1 tag2" or "tag1 tag2,tag3"
     fetch_tags: bool = True,
     private: bool = False,
     to_read: bool = False,
@@ -145,11 +143,11 @@ def create_bookmark(
     except Exception as e:
         logger.error(f"Invalid URL: {url}. Error: {e}")
         return {"error": "invalid_url"}
-    
+
     action = "bookmark_create"
 
     # If title not provided, try to fetch it
-    if not title:        
+    if not title:
         title = utils.get_link_title(url)
 
     # If valid tags not provided, try to fetch suggestions
@@ -158,13 +156,13 @@ def create_bookmark(
         tags = tags_str.replace(",", " ").replace(" ", "+")  # convert to + separated tags
 
     # checks if tag string in argument is not just a whitespace or empty string
-    elif tags.isalnum():  
+    elif tags.isalnum():
         _tag_list: list[str] = tags.replace(",", " ").split()
         tags = "+".join(_tag_list)
 
     # Prepare API payload
     fields: dict[str, str] = {}
-    fields['url'] = url
+    fields["url"] = url
     fields["description"] = title
     fields["tags"] = tags
     fields["replace"] = "yes" if replace else "no"
@@ -220,7 +218,7 @@ def update_bookmark(
     if not new_tag and not new_note and new_private is None and new_to_read is None:
         logger.debug("No updates provided. Nothing to do.")
         return {"status": "missing_update_parameters"}
-    
+
     fields_to_inherit: set[str] = {"description", "tags", "extended", "shared", "toread"}
 
     # check for existing bookmark with the given URL
@@ -236,16 +234,16 @@ def update_bookmark(
         )
         bookmark_meta["status"] = "no_bookmark_found"
         return bookmark_meta
-    
+
     elif fetched_bookmark.get("error") == "invalid_url_format":
         logger.debug(f"Invalid URL format: {url}. Please provide a valid URL.")
         # propagate the error to the calling function
         return {"error": "invalid_url_format"}
-    
+
     elif fetched_bookmark.get("error"):
         logger.debug("Unexpected error occurred while fetching bookmark data.")
         return {"error": "unknown_error"}
-    
+
     # if yes
     elif fields_to_inherit.issubset(fetched_bookmark.keys()):
         # get existing bookmark meta
@@ -254,23 +252,28 @@ def update_bookmark(
         note: str = fetched_bookmark.get("extended", "")
         current_toread: bool = fetched_bookmark.get("toread") == "yes"
         current_private: bool = fetched_bookmark.get("shared") == "no"
-        
+
         # Determine privacy setting
         if new_private is not None:
             private: bool = new_private
         else:
             private: bool = current_private
-        
+
         # Determine to_read setting
         if new_to_read is not None:
             final_toread = new_to_read
         else:
             final_toread = current_toread
-        
+
         # Check if no actual changes are needed
-        if (new_to_read is not None and current_toread == new_to_read and
-            new_private is not None and current_private == new_private and 
-            not new_tag and not new_note):
+        if (
+            new_to_read is not None
+            and current_toread == new_to_read
+            and new_private is not None
+            and current_private == new_private
+            and not new_tag
+            and not new_note
+        ):
             logger.info(f"Bookmark with URL {url} already has the desired status. Nothing to do.")
             return {"status": "no_update_needed"}
 
@@ -345,7 +348,7 @@ def delete_bookmark(url: str) -> dict[str, str]:
     except Exception as e:
         logger.error(f"Error deleting bookmark: {e}")
         return {"error": "api_error"}
-    
+
     result_code: str = response.json().get("result_code", "")
 
     if result_code == "done":
@@ -381,7 +384,7 @@ def rename_tag(old_tag: str, new_tag: str) -> dict[str, str]:
     except Exception as e:
         logger.error(f"Error renaming tag: {e}")
         return {"error": "api_error"}
-    
+
     result_code: str = response.json().get("result_code", "")
 
     if result_code == "done":
@@ -417,7 +420,7 @@ def delete_tag(tag: str) -> dict[str, str]:
     except Exception as e:
         logger.error(f"Error deleting tag: {e}")
         return {"error": "api_error"}
-    
+
     result_code: str = response.json().get("result_code", "")
 
     if result_code == "done":

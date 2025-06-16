@@ -9,7 +9,6 @@ and tags, checking configuration status, and handling user input.
 
 # todo: for get operations with urls, don't check for validation. It is so possible that bookmark was imported and doesn't have http:// or https:// in the url. If no result found, then show a suggestion with error message to try with http:// or https://
 
-
 import os
 import sys
 import time
@@ -109,9 +108,17 @@ def config_status():
 @bookmarks_app.command("get")
 def list_bookmarks(
     tag: str = typer.Option(
-        "", "--tag", "-g", help="Filter by one tag or multiple tags (comma-separated or space-separated inside quotes)"
+        "",
+        "--tag",
+        "-g",
+        help="Filter by one tag or multiple tags (comma-separated or space-separated inside quotes)",
     ),
-    count: int = typer.Option(0, "--count", "-c", help="Number most recent bookmarks to show, can also be used with one tag"),
+    count: int = typer.Option(
+        0,
+        "--count",
+        "-c",
+        help="Number most recent bookmarks to show, can also be used with one tag",
+    ),
     date: str = typer.Option(
         "", "--date", "-d", help="Date to filter bookmarks(in YYYY-MM-DD format)"
     ),
@@ -140,7 +147,9 @@ def list_bookmarks(
             tags = sanitize_tags(tag)
             params["tag"] = tags
             if len(tags.split()) > 1:
-                typer.echo(f"Multiple tags detected, only the first tag: {tags.split()[0]} will be used.")
+                typer.echo(
+                    f"Multiple tags detected, only the first tag: {tags.split()[0]} will be used."
+                )
 
     elif tag or date or url:
         # whitespace or comma separated string
@@ -169,7 +178,6 @@ def list_bookmarks(
         return
 
     for i, bookmark in enumerate(fetched_bookmarks, 1):
-
         title: str = bookmark.get("description", "No title available")
         href: str = bookmark.get("href", "No URL")
         tags: str = bookmark.get("tags", "").replace(" ", ", ")
@@ -183,7 +191,9 @@ def list_bookmarks(
         privacy: str = "[private]" if is_private else "[public]"
         read_status: str = "[unread]" if to_read else ""
         status_text: str = f"{privacy} {read_status}"
-        date_str: str = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%d %B %Y - %I:%M %p")
+        date_str: str = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime(
+            "%d %B %Y - %I:%M %p"
+        )
 
         typer.secho(f"{i}. {title}", fg=title_color, bold=to_read)
         typer.secho(f"   URL: {href}", fg="blue")
@@ -199,13 +209,25 @@ def list_bookmarks(
 @bookmarks_app.command("add")
 def add_bookmark(
     url: str = typer.Argument(..., help="URL of the bookmark, must start with http:// or https://"),
-    bulk: bool = typer.Option(False, "--bulk", "-b", help="Add multiple bookmarks [inside quotes, separated by newlines or commas]"),
+    bulk: bool = typer.Option(
+        False,
+        "--bulk",
+        "-b",
+        help="Add multiple bookmarks [inside quotes, separated by newlines or commas]",
+    ),
     title: str = typer.Option("", "--title", "-t", help="Title of the bookmark"),
     note: str = typer.Option("", "--note", "-n", help="Note for the bookmark"),
-    tags: str = typer.Option("", "--tag", "-g", help="Tags to associate with the bookmark [for multiple tags, use space or comma separated values inside quotes]"),
+    tags: str = typer.Option(
+        "",
+        "--tag",
+        "-g",
+        help="Tags to associate with the bookmark [for multiple tags, use space or comma separated values inside quotes]",
+    ),
     private: bool = typer.Option(False, "--private", "-p", help="Make the bookmark private"),
     to_read: bool = typer.Option(False, "--to-read", "-r", help="Add to reading list"),
-    replace: bool = typer.Option(False, "--replace", "-R", help="Replace existing bookmark with the same URL")
+    replace: bool = typer.Option(
+        False, "--replace", "-R", help="Replace existing bookmark with the same URL"
+    ),
 ) -> None:
     """Add a new bookmark to your LinkHut account.
 
@@ -215,12 +237,14 @@ def add_bookmark(
 
     The bookmark can be marked as private or public, and can be added to your reading list.
     """
-    
+
     if not check_env_variables():
         return
-    
+
     if bulk:
-        add_bulk_bookmarks(urls=url, note=note, tags=tags, private=private, to_read=to_read, replace=replace)
+        add_bulk_bookmarks(
+            urls=url, note=note, tags=tags, private=private, to_read=to_read, replace=replace
+        )
         typer.secho("All bookmarks processed successfully!", fg="green")
         return
 
@@ -232,11 +256,11 @@ def add_bookmark(
         typer.secho(f"\nInvalid URL: {url}", fg="red")
         typer.secho("Please provide a valid URL starting with http:// or https://", fg="red")
         return
-    
+
     elif fields_dict.get("error") == "bookmark_exists":
         typer.secho(f"\nBookmark with URL '{url}' already exists.", fg="yellow")
         return
-    
+
     elif fields_dict.get("error"):
         typer.secho("\nError creating bookmark: API/network issue.", fg="red")
         return
@@ -244,15 +268,19 @@ def add_bookmark(
         typer.secho("\nBookmark created successfully!", fg="green")
         typer.secho(f"Title: {fields_dict.get('description')}", fg="bright_white", bold=True)
         typer.echo(f"URL: {fields_dict.get('url')}")
-        typer.echo(f"Tags: {fields_dict.get('tags', '').replace('+', ', ')}")  # while sending http request, tags are seperated by +, so replace + with ', '
+        typer.echo(
+            f"Tags: {fields_dict.get('tags', '').replace('+', ', ')}"
+        )  # while sending http request, tags are separated by +, so replace + with ', '
         typer.echo(f"Privacy: {'Private' if fields_dict.get('shared') == 'no' else 'Public'}")
         if fields_dict.get("toread") == "yes":
             typer.echo("Added to reading list")
         if fields_dict.get("extended"):
             typer.echo(f"Note: {fields_dict.get('extended')}")
-        
 
-def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool, to_read: bool = False, replace: bool = False) -> None:
+
+def add_bulk_bookmarks(
+    urls: str, note: str, tags: str, private: bool, to_read: bool = False, replace: bool = False
+) -> None:
     """Add multiple bookmarks to your LinkHut account.
 
     This function takes a string of URLs separated by newlines or commas and
@@ -272,7 +300,16 @@ def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool, to_read: 
     urls_list: list[str] = parse_bulk_items(content=urls)
     typer.echo(f"Found {len(urls_list)} URLs to add:")
     for url in tqdm(urls_list, desc="Adding bookmarks", unit="bookmark", ncols=80):
-        add_bookmark(url=url, title="", note=note, tags=tags, private=private, bulk=False, to_read=to_read, replace=replace)
+        add_bookmark(
+            url=url,
+            title="",
+            note=note,
+            tags=tags,
+            private=private,
+            bulk=False,
+            to_read=to_read,
+            replace=replace,
+        )
         typer.echo("-" * 40)
         time.sleep(1)  # Sleep for 1 second to avoid hitting API rate limits
 
@@ -283,11 +320,16 @@ def update_bookmark_cmd(
     tags: str = typer.Option("", "--tag", "-g", help="New tags for the bookmark"),
     note: str = typer.Option("", "--note", "-n", help="Note to append to the bookmark"),
     private: bool | None = typer.Option(None, "--private/--public", help="Update bookmark privacy"),
-    replace: bool = typer.Option(False, "--replace", "-R", help="Replace existing bookmark with the same URL. Default is False which appends the new tags and note to the existing bookmark"),
+    replace: bool = typer.Option(
+        False,
+        "--replace",
+        "-R",
+        help="Replace existing bookmark with the same URL. Default is False which appends the new tags and note to the existing bookmark",
+    ),
 ):
     """Update an existing bookmark in your LinkHut account.
 
-    This command updates a bookmark identified by its URL. 
+    This command updates a bookmark identified by its URL.
     You can change the tags, append a note to any existing notes, and update the privacy setting.
 
     If no bookmark with the specified URL exists, a new one will be created.
@@ -295,10 +337,15 @@ def update_bookmark_cmd(
     if not check_env_variables():
         return
 
-    result: dict[str, str] = update_bookmark(url=url, new_tag=tags, new_note=note, new_private=private, replace=replace)
+    result: dict[str, str] = update_bookmark(
+        url=url, new_tag=tags, new_note=note, new_private=private, replace=replace
+    )
 
     if result.get("status") == "missing_update_parameters":
-        typer.secho("No update parameters provided. Please specify at least one parameter to update.", fg="red")
+        typer.secho(
+            "No update parameters provided. Please specify at least one parameter to update.",
+            fg="red",
+        )
         return
     elif result.get("status") == "no_update_needed":
         typer.secho("No changes detected. Bookmark is already up to date.", fg="yellow")
@@ -311,11 +358,13 @@ def update_bookmark_cmd(
     else:
         if result.get("status") == "no_bookmark_found":
             typer.secho(f"No bookmark found with URL: {url}. Creating a new bookmark.", fg="yellow")
-        
+
         typer.secho("Operation Success!", fg="green")
         typer.secho(f"Title: {result.get('description')}", fg="bright_white", bold=True)
         typer.echo(f"URL: {result.get('url')}")
-        typer.echo(f"Tags: {result.get('tags', '').replace('+', ', ')}")  # while sending http request, tags are seperated by +, so replace + with ', '
+        typer.echo(
+            f"Tags: {result.get('tags', '').replace('+', ', ')}"
+        )  # while sending http request, tags are separated by +, so replace + with ', '
         typer.echo(f"Privacy: {'Private' if result.get('shared') == 'no' else 'Public'}")
         if result.get("toread") == "yes":
             typer.echo("Added to reading list")
@@ -409,15 +458,22 @@ def rename_tag_cmd(
     result: dict[str, str] = rename_tag(old_tag=old_tag, new_tag=new_tag)
 
     if result.get("error") == "invalid_tag_format":
-        typer.secho(f"Invalid tag format: '{old_tag}' or '{new_tag}'. Tags must be alphanumeric and can contain underscores and hyphens, and be up to 50 characters long.", fg="red")
+        typer.secho(
+            f"Invalid tag format: '{old_tag}' or '{new_tag}'. Tags must be alphanumeric and can contain underscores and hyphens, and be up to 50 characters long.",
+            fg="red",
+        )
         return
-    
+
     elif result.get("tag_renaming") == "success":
         typer.secho(f"Tag '{old_tag}' renamed to '{new_tag}' successfully!", fg="green")
 
     else:
-        typer.secho(f"Failed to rename tag '{old_tag}'. It might not exist or there was an issue with the API.", fg="red")
+        typer.secho(
+            f"Failed to rename tag '{old_tag}'. It might not exist or there was an issue with the API.",
+            fg="red",
+        )
         return
+
 
 @tags_app.command("delete")
 def delete_tag_cmd(
@@ -446,13 +502,19 @@ def delete_tag_cmd(
     result: dict[str, str] = delete_tag(tag=tag)
 
     if result.get("error") == "invalid_tag_format":
-        typer.secho(f"❌ Invalid tag format: '{tag}'. Tags must be alphanumeric and can contain underscores and hyphens, and be up to 50 characters long.", fg="red")
+        typer.secho(
+            f"❌ Invalid tag format: '{tag}'. Tags must be alphanumeric and can contain underscores and hyphens, and be up to 50 characters long.",
+            fg="red",
+        )
         return
     elif result.get("tag_deletion") == "success":
         typer.secho(f"✅ Tag '{tag}' deleted successfully from all bookmarks!", fg="green")
         return
     else:
-        typer.secho(f"❌ Failed to delete tag '{tag}'. It might not exist or there was an issue with the API.", fg="red")
+        typer.secho(
+            f"❌ Failed to delete tag '{tag}'. It might not exist or there was an issue with the API.",
+            fg="red",
+        )
         return
 
 
@@ -494,14 +556,19 @@ def reading_list_cmd(
         if result.get("error"):
             typer.secho(f"❌ Error updating reading list: {result.get('error')}", fg="red")
             return
-        
+
         elif result.get("status") == "missing_update_parameters":
-            typer.secho("❌ No update parameters provided. Please specify at least one parameter to update.", fg="red")
+            typer.secho(
+                "❌ No update parameters provided. Please specify at least one parameter to update.",
+                fg="red",
+            )
             return
 
         if result.get("status") == "no_bookmark_found":
-            typer.secho(f"Item with URL '{url}' does not exist in reading list. Adding it now.", fg="yellow")
-      
+            typer.secho(
+                f"Item with URL '{url}' does not exist in reading list. Adding it now.", fg="yellow"
+            )
+
         action = "Added to" if to_read else "Removed from"
 
         typer.secho(f"✅ {action} reading list!", fg="green")
@@ -516,7 +583,9 @@ def reading_list_cmd(
         if to_read:
             typer.echo("\nTip: View your reading list with 'linkhut reading-list'")
         else:
-            typer.echo(f"\nTip: Add it back to your reading list with 'linkhut reading-list {url} --to-read'")
+            typer.echo(
+                f"\nTip: Add it back to your reading list with 'linkhut reading-list {url} --to-read'"
+            )
         return
 
     # If no URL provided, show the reading list
@@ -540,7 +609,9 @@ def reading_list_cmd(
             note_str: str = bookmark.get("extended", "")
             private: bool = bookmark.get("shared") == "no"
             date_str: str = bookmark.get("time", "No date available")
-            date_str: str = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%d %B %Y - %I:%M %p GMT")
+            date_str: str = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime(
+                "%d %B %Y - %I:%M %p GMT"
+            )
 
             typer.secho(f"{i}. {title}", fg="bright_white", bold=True)
             typer.echo(f"   URL: {bookmark_url}")
