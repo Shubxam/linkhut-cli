@@ -427,39 +427,34 @@ def delete_tag_cmd(
 ):
     """Delete a tag from all bookmarks.
 
-    This command removes a specified tag from all your bookmarks. By default,
-    it will ask for confirmation before deleting. Use the --force option to skip
-    the confirmation prompt.
+    This command removes a specified tag from all your bookmarks. By default, it will ask for confirmation before deleting. Use the --force option to skip the confirmation prompt.
 
-    Args:
-        tag: The tag name to delete
+    Args:\n
+        tag: The tag name to delete\n
         force: Whether to skip the confirmation prompt (default: False)
-
-    Returns:
-        None: Results are printed directly to stdout
     """
     if not check_env_variables():
         return
 
-    try:
-        if not force:
-            confirmed = typer.confirm(
-                f"Are you sure you want to delete the tag '{tag}' from all bookmarks?"
-            )
-            if not confirmed:
-                typer.echo("Operation cancelled.")
-                return
+    if not force:
+        confirmed = typer.confirm(
+            f"Are you sure you want to delete the tag '{tag}' from all bookmarks?"
+        )
+        if not confirmed:
+            typer.echo("Operation cancelled.")
+            return
 
-        success = delete_tag(tag=tag)
+    result: dict[str, str] = delete_tag(tag=tag)
 
-        if success:
-            typer.secho(f"✅ Tag '{tag}' deleted successfully!", fg="green")
-        else:
-            typer.secho(f"❌ Failed to delete tag '{tag}'. It might not exist.", fg="red")
-
-    except Exception as e:
-        typer.secho(f"Error deleting tag: {e}", fg="red", err=True)
-        raise typer.Exit(code=1) from e
+    if result.get("error") == "invalid_tag_format":
+        typer.secho(f"❌ Invalid tag format: '{tag}'. Tags must be alphanumeric and can contain underscores and hyphens, and be up to 50 characters long.", fg="red")
+        return
+    elif result.get("tag_deletion") == "success":
+        typer.secho(f"✅ Tag '{tag}' deleted successfully from all bookmarks!", fg="green")
+        return
+    else:
+        typer.secho(f"❌ Failed to delete tag '{tag}'. It might not exist or there was an issue with the API.", fg="red")
+        return
 
 
 # todo: update the output format for reading list command
