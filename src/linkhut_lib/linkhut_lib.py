@@ -5,6 +5,8 @@ This module provides functions for managing bookmarks and tags through the LinkH
 including creating, updating, listing and deleting bookmarks, as well as managing tags.
 """
 
+# todo: standardize error codes and messages across all functions
+
 import json
 import sys
 
@@ -25,7 +27,7 @@ def get_bookmarks(
     tag: str = "",
     date: str = "",
     url: str = "",
-    count: int | None = None,
+    count: int = 0,
 ) -> list[dict[str, str]]:
     """
     Get bookmarks from LinkHut. Supports filtering or fetching by recent count.
@@ -48,9 +50,10 @@ def get_bookmarks(
     fields: dict[str, str] = {}
     action: str
 
-    if count is not None:
+    # Determine action based on provided parameters
+    if count: 
         action = "bookmark_recent"
-        fields["count"] = str(count)  # if count is 0, then returns 15
+        fields["count"] = str(count) 
         if tag:
             # bookmark_recent accept only one tag, if multiple tags are provided, then only the first one is used
             # if presented with wrong tag, it returns {"posts": []}
@@ -94,7 +97,8 @@ def get_bookmarks(
             return fetched_bookmarks
         elif response.json().get("result_code") == "something went wrong" or not fetched_bookmarks:
             # result code "something went wrong" indicates posts/get endpoint was called with wrong url
-            logger.error("No Bookmarks Found")
+            # todo: update logger error class severity equal to debug
+            logger.warning("No Bookmarks Found")
             return [{"error": "no_bookmarks_found"}]
         else:
             logger.warning("No bookmarks found for the given criteria")
