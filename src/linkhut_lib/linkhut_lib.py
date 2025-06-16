@@ -18,7 +18,7 @@ from . import utils
 logger.remove()
 logger.add(
     sys.stderr,
-    level="INFO",
+    level="ERROR",
     format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
 )
 
@@ -302,15 +302,15 @@ def get_reading_list(count: int = 5) -> list[dict[str, str]]:
         None: Results are printed directly to stdout
     """
     reading_list: list[dict[str, str]] = get_bookmarks(tag="unread", count=count)
-    if reading_list[0].get("error"):
-        logger.error("No bookmarks found in the reading list.")
+    if reading_list[0].get("error") == "no_bookmarks_found":
+        logger.info("No bookmarks found in the reading list.")
         return [{"error": "no_bookmarks_found"}]
     elif reading_list:
-        logger.debug(f"Reading list fetched successfully: {reading_list}")
+        logger.debug(f"Reading list fetched successfully: {json.dumps(reading_list, indent=2)}")
         return reading_list
     else:
         logger.error("No bookmarks found in the reading list.")
-        return [{"error": "no_bookmarks_found"}]
+        return [{"error": "api_error"}]
 
 
 def delete_bookmark(url: str) -> dict[str, str]:
@@ -344,7 +344,7 @@ def delete_bookmark(url: str) -> dict[str, str]:
         return {"bookmark_deletion": "success"}
     else:
         logger.error(f"Unable to delete bookmark with URL {url}. Result code: {result_code}")
-        return {"bookmark_deletion": "unsuccessful"}
+        return {"bookmark_deletion": "failure"}
 
 
 def rename_tag(old_tag: str, new_tag: str) -> dict[str, str]:
@@ -380,7 +380,7 @@ def rename_tag(old_tag: str, new_tag: str) -> dict[str, str]:
         return {"tag_renaming": "success"}
     else:
         logger.error(f"Failed to rename tag '{old_tag}' to '{new_tag}'. Result code: {result_code}")
-        return {"tag_renaming": "unsuccessful"}
+        return {"tag_error": "unsuccessful"}
 
 
 # todo: #20 update error handling for delete_tag, rename_tag
@@ -403,7 +403,7 @@ def delete_tag(tag: str) -> dict[str, str]:
             raise ValueError(f"Invalid tag format: {tag}")
         response: Response = utils.linkhut_api_call(action=action, payload=fields)
     except ValueError as e:
-        logger.error(f"Invalid tag format: {tag}. Error: {e}")
+        logger.error(f"Invalid tag format: {tag}.")
         return {"error": "invalid_tag_format"}
     except Exception as e:
         logger.error(f"Error deleting tag: {e}")
