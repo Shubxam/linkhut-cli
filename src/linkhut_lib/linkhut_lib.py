@@ -73,12 +73,13 @@ def get_bookmarks(
                 return [{"error": "invalid_date_format"}]
             fields["dt"] = date
         if url:
-            try:
-                # TODO: Add URL encoding if necessary utils.encode_url(url)
-                utils.verify_url(url)
-            except ValueError as e:
-                logger.error(f"Invalid URL format for {url}: {e}")
-                return [{"error": "invalid_url_format"}]
+            # TODO: Add URL encoding
+            # no need to validate URL format here if user has imported the bookmark file, not all URLs will have http:// or https://
+            # try:
+            #     utils.verify_url(url)
+            # except ValueError as e:
+            #     logger.error(f"Invalid URL format for {url}: {e}")
+            #     return [{"error": "invalid_url_format"}]
             fields["url"] = url
     else:
         # Default behavior: get recent 15 posts
