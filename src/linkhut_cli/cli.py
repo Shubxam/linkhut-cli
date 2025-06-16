@@ -28,12 +28,11 @@ from linkhut_lib.linkhut_lib import (
     delete_tag,
     get_bookmarks,
     get_reading_list,
-    reading_list_toggle,
     rename_tag,
     update_bookmark,
 )
 
-from .utils import parse_bulk_items
+from .utils import parse_bulk_items, sanitize_tags
 
 app = typer.Typer(help="LinkHut CLI - Manage your bookmarks from the command line")
 bookmarks_app = typer.Typer(help="Manage bookmarks")
