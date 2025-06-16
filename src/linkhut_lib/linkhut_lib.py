@@ -275,11 +275,20 @@ def update_bookmark(
             return {"status": "no_update_needed"}
 
         logger.info(f"Bookmark with URL {url} already exists. Updating it.")
+
+        # Refactored tag and note concatenation for clarity
+        if replace:
+            updated_tags = new_tag
+            updated_note = new_note
+        else:
+            updated_tags = f"{tags} {new_tag}".strip() if new_tag else tags
+            updated_note = f"{note} {new_note}".strip() if new_note else note
+
         bookmark_meta = create_bookmark(
             url=url,
             title=title,
-            tags=new_tag if replace else tags + " " + new_tag,
-            note=new_note if replace else note + " " + new_note if new_note else note,
+            tags=updated_tags,
+            note=updated_note,
             private=private,
             replace=True,
             fetch_tags=False,
@@ -403,7 +412,7 @@ def delete_tag(tag: str) -> dict[str, str]:
             raise ValueError
         response: Response = utils.linkhut_api_call(action=action, payload=fields)
     except ValueError as e:
-        logger.error(f"Invalid tag format: {tag}.")
+        logger.error(f"Invalid tag format for {tag}: {e}.")
         return {"error": "invalid_tag_format"}
     except Exception as e:
         logger.error(f"Error deleting tag: {e}")
