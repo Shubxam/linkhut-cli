@@ -260,6 +260,19 @@ def is_valid_date(date_str: str) -> bool:
     return result
 
 
+def is_valid_tag(tag: str) -> bool:
+    """
+    Check if the given string is a valid tag.
+
+    Args:
+        tag (str): The tag string to validate.
+
+    Returns:
+        bool: True if the tag is valid, False otherwise.
+    """
+    return all(c.isalnum() or c in "-_" for c in tag) and len(tag) <= 50
+
+
 if __name__ == "__main__":
     # Example usage
     dest_url = "http://news.ycombinator.com"

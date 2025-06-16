@@ -363,7 +363,7 @@ def rename_tag(old_tag: str, new_tag: str) -> dict[str, str]:
 
     try:
         # verify the tag format before making the API call
-        if not old_tag.isalnum() or not new_tag.isalnum():
+        if not utils.is_valid_tag(old_tag) or not utils.is_valid_tag(new_tag):
             raise ValueError(f"Invalid tag format: {old_tag} or {new_tag}")
         response: Response = utils.linkhut_api_call(action=action, payload=fields)
     except ValueError as e:
@@ -399,8 +399,8 @@ def delete_tag(tag: str) -> dict[str, str]:
 
     try:
         # verify the tag format before making the API call
-        if not tag.isalnum():
-            raise ValueError(f"Invalid tag format: {tag}")
+        if not utils.is_valid_tag(tag):
+            raise ValueError
         response: Response = utils.linkhut_api_call(action=action, payload=fields)
     except ValueError as e:
         logger.error(f"Invalid tag format: {tag}.")
