@@ -163,8 +163,6 @@ def list_bookmarks(
         typer.echo("An error occurred while fetching bookmarks. Issue with network or API.")
         return
 
-    typer.echo(f"Found {len(fetched_bookmarks)} bookmarks:")
-
     for i, bookmark in enumerate(fetched_bookmarks, 1):
 
         title: str = bookmark.get("description", "No title available")
@@ -172,18 +170,24 @@ def list_bookmarks(
         tags: str = bookmark.get("tags", "").replace(" ", ", ")
         is_private: bool = bookmark.get("shared") == "no"
         to_read: bool = bookmark.get("toread") == "yes"
+        note: str = bookmark.get("extended", "")
+        date_str: str = bookmark.get("time", "No date available")
 
         # Format output with color and indicators
         title_color: str = "bright_white" if to_read else "white"
         privacy: str = "[private]" if is_private else "[public]"
         read_status: str = "[unread]" if to_read else ""
         status_text: str = f"{privacy} {read_status}"
+        date_str: str = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%d %B %Y - %I:%M %p")
 
         typer.secho(f"{i}. {title}", fg=title_color, bold=to_read)
         typer.secho(f"   URL: {href}", fg="blue")
         typer.secho(f"   Tags: {tags}", fg="cyan")
+        typer.secho(f"   Date: {date_str}", fg="magenta")
         typer.secho(f"   Status: {status_text}", fg="yellow")
         typer.echo("")  # Empty line between bookmarks
+        if note:
+            typer.secho(f"   Note: {note}", fg="green")
 
 
 @bookmarks_app.command("add")
