@@ -137,7 +137,7 @@ def get_link_title(dest_url: str) -> str:
     title: str
     dest_url_str: str = f"q={dest_url}"
 
-    # fetch the following fields: title, description, url (disabling, as setting custom fields is supported but doesnt work with the API)
+    # fetch the following fields: title, description, url (disabling, as setting custom fields is supported but does not work with the API)
     # fields_str = "fields=title,description,url"
 
     # allow websites with blocked content
