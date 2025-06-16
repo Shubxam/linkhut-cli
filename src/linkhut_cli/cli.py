@@ -190,15 +190,17 @@ def list_bookmarks(
             typer.secho(f"   Note: {note}", fg="green")
 
 
+# todo: #25 remove the bulk argument from add_bookmark and infer if multiple URLs are provided by checking for newlines or commas
 @bookmarks_app.command("add")
 def add_bookmark(
     url: str = typer.Argument(..., help="URL of the bookmark, must start with http:// or https://"),
-    bulk: bool = typer.Option(False, "--bulk", "-b", help="Add multiple bookmarks"),
+    bulk: bool = typer.Option(False, "--bulk", "-b", help="Add multiple bookmarks [inside quotes, separated by newlines or commas]"),
     title: str = typer.Option("", "--title", "-t", help="Title of the bookmark"),
     note: str = typer.Option("", "--note", "-n", help="Note for the bookmark"),
-    tags: str = typer.Option("", "--tag", "-g", help="Tags to associate with the bookmark"),
+    tags: str = typer.Option("", "--tag", "-g", help="Tags to associate with the bookmark [for multiple tags, use space or comma separated values inside quotes]"),
     private: bool = typer.Option(False, "--private", "-p", help="Make the bookmark private"),
     to_read: bool = typer.Option(False, "--to-read", "-r", help="Add to reading list"),
+    replace: bool = typer.Option(False, "--replace", "-R", help="Replace existing bookmark with the same URL")
 ) -> None:
     """Add a new bookmark to your LinkHut account.
 
@@ -213,7 +215,7 @@ def add_bookmark(
         return
     
     if bulk:
-        add_bulk_bookmarks(urls=url, note=note, tags=tags, private=private)
+        add_bulk_bookmarks(urls=url, note=note, tags=tags, private=private, to_read=to_read, replace=replace)
         typer.secho("All bookmarks processed successfully!", fg="green")
         return
 
@@ -222,29 +224,30 @@ def add_bookmark(
     )
 
     if fields_dict.get("error") == "invalid_url":
-        typer.secho(f"❌ Invalid URL: {fields_dict.get('url')}", fg="red")
+        typer.secho(f"\nInvalid URL: {url}", fg="red")
         typer.secho("Please provide a valid URL starting with http:// or https://", fg="red")
         return
     
     elif fields_dict.get("error") == "bookmark_exists":
-        typer.secho(f"❌ Bookmark with URL '{fields_dict.get('url')}' already exists.", fg="yellow")
+        typer.secho(f"\nBookmark with URL '{url}' already exists.", fg="yellow")
         return
     
     elif fields_dict.get("error"):
-        typer.secho("❌ Error creating bookmark: API/network issue.", fg="red")
+        typer.secho("\nError creating bookmark: API/network issue.", fg="red")
         return
     else:
-        typer.secho("✅ Bookmark created successfully!", fg="green")
+        typer.secho("\nBookmark created successfully!", fg="green")
         typer.secho(f"Title: {fields_dict.get('description')}", fg="bright_white", bold=True)
         typer.echo(f"URL: {fields_dict.get('url')}")
         typer.echo(f"Tags: {fields_dict.get('tags', '').replace('+', ', ')}")  # while sending http request, tags are seperated by +, so replace + with ', '
         typer.echo(f"Privacy: {'Private' if fields_dict.get('shared') == 'no' else 'Public'}")
-        typer.echo(f"Read Status: {'To Read' if fields_dict.get('toread') == 'yes' else 'Read'}")
+        if fields_dict.get("toread") == "yes":
+            typer.echo("Added to reading list")
         if fields_dict.get("extended"):
             typer.echo(f"Note: {fields_dict.get('extended')}")
         
 
-def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool, to_read: bool = False) -> None:
+def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool, to_read: bool = False, replace: bool = False) -> None:
     """Add multiple bookmarks to your LinkHut account.
 
     This function takes a string of URLs separated by newlines or commas and
@@ -260,11 +263,13 @@ def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool, to_read: 
     Returns:
         None: Results are printed directly to stdout
     """
-    # todo: add rate limiting
-    urls_list: list[str] = parse_bulk_items(content=urls, type="url")
+
+    urls_list: list[str] = parse_bulk_items(content=urls)
     typer.echo(f"Found {len(urls_list)} URLs to add:")
-    for url in urls_list:
-        add_bookmark(url=url, title="", note=note, tags=tags, private=private, bulk=False, to_read=to_read)
+    for url in tqdm(urls_list, desc="Adding bookmarks", unit="bookmark", ncols=80):
+        add_bookmark(url=url, title="", note=note, tags=tags, private=private, bulk=False, to_read=to_read, replace=replace)
+        typer.echo("-" * 40)
+        time.sleep(1)  # Sleep for 1 second to avoid hitting API rate limits
 
 
 @bookmarks_app.command("update")
