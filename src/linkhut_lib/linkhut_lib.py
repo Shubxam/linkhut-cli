@@ -229,8 +229,8 @@ def update_bookmark(
     # if no, then create a new bookmark with given values
     if fetched_bookmark.get("error") == "no_bookmarks_found":
         logger.debug(f"Bookmark with URL {url} not found. Creating a new one.")
-        private = new_private == new_private if new_private is not None else False
-        to_read = new_to_read if new_to_read is not None else False
+        private: bool = new_private if new_private is not None else False
+        to_read: bool = new_to_read if new_to_read is not None else False
         bookmark_meta: dict[str, str] = create_bookmark(
             url=url, tags=new_tag, note=new_note, private=private, to_read=to_read
         )
