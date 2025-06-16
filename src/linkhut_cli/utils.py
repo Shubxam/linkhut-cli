@@ -13,7 +13,7 @@ def parse_bulk_items(content: str) -> list[str]:
     return [item.strip() for item in re.split(r"[,\n]+", content) if item.strip()]
 
 
-def parse_linkhut_bookmarks(response: list[dict[str, str]]):
+def parse_linkhut_bookmarks():
     """
     Parse a list of dictionaries containing linkhut bookmarks.
     """
