@@ -275,44 +275,53 @@ def add_bulk_bookmarks(urls: str, note: str, tags: str, private: bool, to_read: 
 @bookmarks_app.command("update")
 def update_bookmark_cmd(
     url: str = typer.Argument(..., help="URL of the bookmark to update"),
-    tags: list[str] | None = typer.Option(None, "--tag", "-g", help="New tags for the bookmark"),
-    note: str | None = typer.Option(None, "--note", "-n", help="Note to append to the bookmark"),
-    private: bool | None = typer.Option(None, "--private/--public", help="Update bookmark privacy"),
+    tags: str = typer.Option("", "--tag", "-g", help="New tags for the bookmark"),
+    note: str = typer.Option("", "--note", "-n", help="Note to append to the bookmark"),
+    private: bool = typer.Option(False, "--private/--public", help="Update bookmark privacy"),
+    replace: bool = typer.Option(False, "--replace", "-R", help="Replace existing bookmark with the same URL. Default is False which appends the new tags and note to the existing bookmark"),
 ):
     """Update an existing bookmark in your LinkHut account.
 
-    This command updates a bookmark identified by its URL. You can change the tags,
-    append a note to any existing notes, and update the privacy setting.
+    This command updates a bookmark identified by its URL. 
+    You can change the tags, append a note to any existing notes, and update the privacy setting.
 
     If no bookmark with the specified URL exists, a new one will be created.
-
-    Returns:
-        None: Results are printed directly to stdout
     """
     if not check_env_variables():
         return
 
-    try:
-        success = update_bookmark(url=url, new_tag=tags, new_note=note, private=private)
+    private_str: str = "yes" if private else "no"
+    tags_str: str = tags
+    result: dict[str, str] = update_bookmark(url=url, new_tag=tags_str, new_note=note or "", new_private=private_str, replace=replace)
 
-        if success:
-            typer.secho("✅ Bookmark updated successfully!", fg="green")
-            typer.echo(f"URL: {url}")
-            if tags:
-                typer.echo(f"Updated tags: {', '.join(tags)}")
-            if note:
-                typer.echo("Note appended")
-            if private is not None:
-                status = "Private" if private else "Public"
-                typer.echo(f"Updated visibility: {status}")
-        else:
-            typer.secho("❌ Failed to update bookmark.", fg="red")
+    if result.get("status") == "missing_update_parameters":
+        typer.secho("No update parameters provided. Please specify at least one parameter to update.", fg="red")
+        return
+    elif result.get("status") == "no_update_needed":
+        typer.secho("No changes detected. Bookmark is already up to date.", fg="yellow")
+        return
+    elif result.get("error") == "invalid_url_format":
+        typer.secho(f"Invalid URL format: {url}. Please provide a valid URL.", fg="red")
+        return
+    elif result.get("error"):
+        typer.secho("Error updating bookmark: API/network issue.")
+    else:
+        if result.get("status") == "no_bookmark_found":
+            typer.secho(f"No bookmark found with URL: {url}. Creating a new bookmark.", fg="yellow")
+        
+        typer.secho("Operation Success!", fg="green")
+        typer.secho(f"Title: {result.get('description')}", fg="bright_white", bold=True)
+        typer.echo(f"URL: {result.get('url')}")
+        typer.echo(f"Tags: {result.get('tags', '').replace('+', ', ')}")  # while sending http request, tags are seperated by +, so replace + with ', '
+        typer.echo(f"Privacy: {'Private' if result.get('shared') == 'no' else 'Public'}")
+        if result.get("toread") == "yes":
+            typer.echo("Added to reading list")
+        if result.get("extended"):
+            typer.echo(f"Note: {result.get('extended')}")
 
-    except Exception as e:
-        typer.secho(f"Error updating bookmark: {e}", fg="red", err=True)
-        raise typer.Exit(code=1) from e
 
-
+# todo: evaluate the need for try except block in cli
+# todo: configure required arguments and position only arguments
 @bookmarks_app.command("delete")
 def delete_bookmark_cmd(
     url: str = typer.Argument(..., help="URL of the bookmark to delete"),
