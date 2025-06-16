@@ -144,7 +144,7 @@ def create_bookmark(
         utils.verify_url(url)
     except Exception as e:
         logger.error(f"Invalid URL: {url}. Error: {e}")
-        return {"status": "invalid_url"}
+        return {"error": "invalid_url"}
     
     action = "bookmark_create"
 
@@ -182,91 +182,11 @@ def create_bookmark(
             logger.debug(f"Bookmark created successfully: {response_dict}")
             return fields
         else:
-            logger.error(f"Failed to create bookmark: {response_dict}")
-            return {"status": "bookmark already exists"}
+            logger.warning(f"Failed to create bookmark: {response_dict}")
+            return {"error": "bookmark_exists"}
     except Exception as e:
         logger.error(f"Error creating bookmark: {e}")
-        return {"status": "API error"}
-
-
-def reading_list_toggle(
-    url: str, 
-    to_read: bool, 
-    note: str = "",
-    tags: str = ""
-) -> dict[str, str]:
-    """
-    Toggle the to-read status of a bookmark.
-
-    This function either updates an existing bookmark's to-read status or creates a new
-    bookmark with the specified to-read status if it doesn't exist.
-
-    Args:
-        url (str): The URL of the bookmark to toggle
-        to_read (bool): Whether to mark as to-read (True) or read (False)
-        note (Optional[str]): Note to append to the bookmark if provided
-        tags (Optional[list[str]]): Tags to add if creating a new bookmark, append to existing tags if updating
-
-    Returns:
-        bool: True if the operation was successful, False otherwise
-    """
-
-    # check for existing bookmark with the given URL
-    fetched_bookmark: dict[str, str] = get_bookmarks(url=url)[0]
-    fields_to_inherit: set[str] = {"toread", "extended", "description", "tags", "shared"}
-
-    # if bookmark not found, then create a new bookmark
-    if fetched_bookmark.get("error") == "no_bookmarks_found":
-        logger.debug(f"Bookmark with URL {url} not found. Creating a new one.")
-        bookmark_meta: dict[str, str] = create_bookmark(
-            url=url, to_read=to_read, note=note, tags=tags
-        )
-        return bookmark_meta
-
-    elif fetched_bookmark.get("error") == "invalid_url_format":
-        logger.debug(f"Invalid URL format: {url}. Please provide a valid URL.")
-        # propagate the error to the calling function
-        return {"error": "invalid_url_format"}
-
-    # if bookmark exists, then update the bookmark
-    # proper api result should contain all fields_to_inherit
-    elif fields_to_inherit.issubset(fetched_bookmark.keys()):
-        # get existing bookmark meta
-        logger.debug(f"Bookmark with URL {url} already exists.")
-        to_read_current: bool = fetched_bookmark.get("toread", "yes") == "yes"
-        embed_note: str = fetched_bookmark.get("extended", "")
-        title: str = fetched_bookmark.get("description", url)
-        current_tags: str = fetched_bookmark.get("tags", "")
-        private: bool = fetched_bookmark.get("shared", "yes") == "no"
-        logger.debug(
-            f"Bookmark with URL {url} current status to_read = {to_read_current}, changing to {to_read}"
-        )
-
-        # check if toread is already set to the desired value and no new note to append
-        if to_read_current == to_read and note is None:
-            logger.info(
-                f"Bookmark with URL {url} already has the desired to_read status. Nothing to do."
-            )
-            return {"status": "no_update_needed"}
-
-        # if not, update the bookmark with the new toread status and note
-        bookmark_meta: dict[str, str] = create_bookmark(
-            url=url,
-            title=title,
-            replace=True,
-            to_read=to_read,
-            note=embed_note + note if note else embed_note,
-            fetch_tags=False,
-            tags=current_tags if not tags else current_tags + " " + tags,
-            private=private,
-        )
-        return bookmark_meta
-    else:
-        logger.debug("Unexpected bookmark format received. Missing required fields.")
-        return {"error": "unknown_error"}
-
-
-# todo: #19 update_bookmark and reading_list_toggle functions can be merged into one function
+        return {"error": "API error"}
 def update_bookmark(
     url: str,
     new_tag: str = "",
