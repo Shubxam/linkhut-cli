@@ -343,10 +343,10 @@ def delete_bookmark_cmd(
     bookmark: dict[str, str] = get_bookmarks(url=url)[0]
 
     if bookmark.get("error") == "no_bookmarks_found":
-        typer.secho(f"❌ Bookmark with URL '{url}' not found.", fg="red")
+        typer.secho(f"Bookmark with URL '{url}' not found.", fg="red")
         return
     elif bookmark.get("error"):
-        typer.secho("❌ Error fetching bookmark details. Issue with network or API.", fg="red")
+        typer.secho("Error fetching bookmark details. Issue with network or API.", fg="red")
         return
 
     # Display bookmark details
@@ -380,9 +380,9 @@ def delete_bookmark_cmd(
     result = delete_bookmark(url=url)
 
     if result.get("bookmark_deletion") == "success":
-        typer.secho("✅ Bookmark deleted successfully!", fg="green")
+        typer.secho("Bookmark deleted successfully!", fg="green")
     else:
-        typer.secho("❌ Failed to delete bookmark.", fg="red")
+        typer.secho("Failed to delete bookmark.", fg="red")
 
 
 @tags_app.command("rename")
