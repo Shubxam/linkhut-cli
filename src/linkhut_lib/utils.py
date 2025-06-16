@@ -167,7 +167,7 @@ def get_tags_suggestion(dest_url: str) -> str:
         dest_url (str): The URL of the link to fetch tags for.
 
     Returns:
-        str: A str of suggested tags seperated by comma.
+        str: A str of suggested tags separated by comma.
 
     Note: returns "AutoTagFetchFailed" if the request fails or no suggested tags found.
     """
