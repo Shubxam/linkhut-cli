@@ -385,7 +385,6 @@ def delete_bookmark_cmd(
         typer.secho("❌ Failed to delete bookmark.", fg="red")
 
 
-# Tag commands
 @tags_app.command("rename")
 def rename_tag_cmd(
     old_tag: str = typer.Argument(..., help="Current tag name"),
@@ -400,25 +399,22 @@ def rename_tag_cmd(
     Args:
         old_tag: The current tag name to be replaced
         new_tag: The new tag name to use instead
-
-    Returns:
-        None: Results are printed directly to stdout
     """
     if not check_env_variables():
         return
 
-    try:
-        success = rename_tag(old_tag=old_tag, new_tag=new_tag)
+    result: dict[str, str] = rename_tag(old_tag=old_tag, new_tag=new_tag)
 
-        if success:
-            typer.secho(f"✅ Tag '{old_tag}' renamed to '{new_tag}' successfully!", fg="green")
-        else:
-            typer.secho(f"❌ Failed to rename tag '{old_tag}'.", fg="red")
+    if result.get("error") == "invalid_tag_format":
+        typer.secho(f"Invalid tag format: '{old_tag}' or '{new_tag}'. Tags must be alphanumeric and can contain underscores and hyphens, and be up to 50 characters long.", fg="red")
+        return
+    
+    elif result.get("tag_renaming") == "success":
+        typer.secho(f"Tag '{old_tag}' renamed to '{new_tag}' successfully!", fg="green")
 
-    except Exception as e:
-        typer.secho(f"Error renaming tag: {e}", fg="red", err=True)
-        raise typer.Exit(code=1) from e
-
+    else:
+        typer.secho(f"Failed to rename tag '{old_tag}'. It might not exist or there was an issue with the API.", fg="red")
+        return
 
 @tags_app.command("delete")
 def delete_tag_cmd(
