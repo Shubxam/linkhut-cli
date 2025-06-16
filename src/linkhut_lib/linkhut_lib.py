@@ -187,83 +187,108 @@ def create_bookmark(
     except Exception as e:
         logger.error(f"Error creating bookmark: {e}")
         return {"error": "API error"}
+
+
 def update_bookmark(
     url: str,
     new_tag: str = "",
     new_note: str = "",
-    new_private: str = "",
+    new_private: bool | None = None,
+    new_to_read: bool | None = None,
     replace: bool = False,  # whether to replace data or append to existing data
 ) -> dict[str, str]:
     """
     Update an existing bookmark or create a new one if it doesn't exist.
 
-    This function allows updating the tags, notes, and privacy settings of a bookmark.
+    This function allows updating the tags, notes, privacy settings, and to-read status of a bookmark.
     If the bookmark doesn't exist, it will create a new one with the provided parameters.
+    This function replaces the previous reading_list_toggle function.
 
     Args:
         url (str): The URL of the bookmark to update
-        new_tag (Optional[list[str]]): New tags to set for the bookmark (replaces existing tags)
-        new_note (Optional[str]): Note to append to the existing note
-        private (Optional[bool]): Whether to set the bookmark as private (True) or public (False)
+        new_tag (str): New tags to set for the bookmark (replaces existing tags if replace=True)
+        new_note (str): Note to append to the existing note (or replace if replace=True)
+        new_private (str): Whether to set the bookmark as private ("yes") or public ("no")
+        to_read (bool | None): Whether to mark as to-read (True) or read (False). None means no change.
+        replace (bool): Whether to replace existing data or append to it
 
     Returns:
-        bool: True if the update was successful, False otherwise
+        dict[str, str]: Status information about the update operation
     """
 
     # check if there is nothing to update, if so return false
-    if not new_tag and not new_note and not new_private:
+    if not new_tag and not new_note and new_private is None and new_to_read is None:
         logger.debug("No updates provided. Nothing to do.")
         return {"status": "missing_update_parameters"}
-    else:
-        fields_to_inherit: set[str] = {"description", "tags", "extended", "shared", "toread"}
+    
+    fields_to_inherit: set[str] = {"description", "tags", "extended", "shared", "toread"}
 
-        # check for existing bookmark with the given URL
-        fetched_bookmark: dict[str, str] = get_bookmarks(url=url)[0]
+    # check for existing bookmark with the given URL
+    fetched_bookmark: dict[str, str] = get_bookmarks(url=url)[0]
 
-        # if no, then create a new bookmark with given values
-        if fetched_bookmark.get("error") == "no_bookmarks_found":
-            logger.debug(f"Bookmark with URL {url} not found. Creating a new one.")
-            bookmark_meta: dict[str, str] = create_bookmark(url=url, tags=new_tag, note=new_note, private=False)
-            return bookmark_meta
+    # if no, then create a new bookmark with given values
+    if fetched_bookmark.get("error") == "no_bookmarks_found":
+        logger.debug(f"Bookmark with URL {url} not found. Creating a new one.")
+        private = new_private == new_private if new_private is not None else False
+        to_read = new_to_read if new_to_read is not None else False
+        bookmark_meta: dict[str, str] = create_bookmark(
+            url=url, tags=new_tag, note=new_note, private=private, to_read=to_read
+        )
+        bookmark_meta["status"] = "no_bookmark_found"
+        return bookmark_meta
+    
+    elif fetched_bookmark.get("error") == "invalid_url_format":
+        logger.debug(f"Invalid URL format: {url}. Please provide a valid URL.")
+        # propagate the error to the calling function
+        return {"error": "invalid_url_format"}
+    
+    elif fetched_bookmark.get("error"):
+        logger.debug("Unexpected error occurred while fetching bookmark data.")
+        return {"error": "unknown_error"}
+    
+    # if yes
+    elif fields_to_inherit.issubset(fetched_bookmark.keys()):
+        # get existing bookmark meta
+        title: str = fetched_bookmark.get("description", url)
+        tags: str = fetched_bookmark.get("tags", "")
+        note: str = fetched_bookmark.get("extended", "")
+        current_toread: bool = fetched_bookmark.get("toread") == "yes"
+        current_private: bool = fetched_bookmark.get("shared") == "no"
         
-        elif fetched_bookmark.get("error") == "invalid_url_format":
-            logger.debug(f"Invalid URL format: {url}. Please provide a valid URL.")
-            # propagate the error to the calling function
-            return {"error": "invalid_url_format"}
-        
-        elif fetched_bookmark.get("error"):
-            logger.debug("Unexpected error occurred while fetching bookmark data.")
-            return {"error": "unknown_error"}
-        
-        # if yes
-        elif fields_to_inherit.issubset(fetched_bookmark.keys()):
-            # get existing bookmark meta
-            title: str = fetched_bookmark.get("description", url)
-            tags: str = fetched_bookmark.get("tags", "")
-            note: str = fetched_bookmark.get("extended", "")
-            toread: bool = fetched_bookmark.get("toread", "yes") == "yes"
-            if new_private is not None:
-                # if new_private is provided, use it, otherwise use existing value
-                private: bool = True if new_private == "yes" else False
-            else:
-                # if new_private is not provided, use existing value
-                private: bool = fetched_bookmark.get("shared", "yes") == "no"
-
-            logger.info(f"Bookmark with URL {url} already exists. Updating it.")
-            bookmark_meta = create_bookmark(
-                url=url,
-                title=title,
-                tags=new_tag if replace else tags + " " + new_tag if new_tag else tags,
-                note=new_note if replace else note + " " + new_note if new_note else note,
-                private=private,
-                replace=True,
-                fetch_tags=False,
-                to_read=toread,
-            )
-            return bookmark_meta
+        # Determine privacy setting
+        if new_private is not None:
+            private: bool = new_private
         else:
-            logger.debug("Unexpected bookmark format received. Missing required fields.")
-            return {"error": "unknown_error"}
+            private: bool = current_private
+        
+        # Determine to_read setting
+        if new_to_read is not None:
+            final_toread = new_to_read
+        else:
+            final_toread = current_toread
+        
+        # Check if no actual changes are needed
+        if (new_to_read is not None and current_toread == new_to_read and
+            new_private is not None and current_private == new_private and 
+            not new_tag and not new_note):
+            logger.info(f"Bookmark with URL {url} already has the desired status. Nothing to do.")
+            return {"status": "no_update_needed"}
+
+        logger.info(f"Bookmark with URL {url} already exists. Updating it.")
+        bookmark_meta = create_bookmark(
+            url=url,
+            title=title,
+            tags=new_tag if replace else tags + " " + new_tag,
+            note=new_note if replace else note + " " + new_note if new_note else note,
+            private=private,
+            replace=True,
+            fetch_tags=False,
+            to_read=final_toread,
+        )
+        return bookmark_meta
+    else:
+        logger.debug("Unexpected bookmark format received. Missing required fields.")
+        return {"error": "unknown_error"}
 
 
 def get_reading_list(count: int = 5) -> list[dict[str, str]]:
