@@ -7,11 +7,17 @@ application, using the Typer library. It provides commands for managing bookmark
 and tags, checking configuration status, and handling user input.
 """
 
+# todo: for get operations with urls, don't check for validation. It is so possible that bookmark was imported and doesn't have http:// or https:// in the url. If no result found, then show a suggestion with error message to try with http:// or https://
+
+
 import os
 import sys
+import time
+from datetime import datetime
 
 import dotenv
 import typer
+from tqdm import tqdm
 
 # Add the parent directory to sys.path to be able to import from linkhut_lib
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -183,7 +189,7 @@ def list_bookmarks(
         typer.secho(f"{i}. {title}", fg=title_color, bold=to_read)
         typer.secho(f"   URL: {href}", fg="blue")
         typer.secho(f"   Tags: {tags}", fg="cyan")
-        typer.secho(f"   Date: {date_str}", fg="magenta")
+        typer.secho(f"   Date: {date_str} GMT", fg="magenta")
         typer.secho(f"   Status: {status_text}", fg="yellow")
         typer.echo("")  # Empty line between bookmarks
         if note:
