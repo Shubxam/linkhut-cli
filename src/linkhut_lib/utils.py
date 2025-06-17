@@ -133,7 +133,7 @@ def get_link_title(dest_url: str) -> str:
 
     Note: returns url as title if the request fails.
     """
-    # verify_url(url) # todo
+    # verify_url(dest_url)
     title: str
     dest_url_str: str = f"q={dest_url}"
 
