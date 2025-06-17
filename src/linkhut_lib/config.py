@@ -4,7 +4,7 @@ Configuration settings for the LinkHut and LinkPreview APIs.
 This module contains the base URLs and header templates for making API requests.
 The actual API keys are inserted into these templates at runtime.
 """
-# todo: make use of ENUMs and TypeAlias and Dataclasses
+# TODO: make use of ENUMs and TypeAlias and Dataclasses
 
 # from enum import Enum
 # from typing import TypeAlias
