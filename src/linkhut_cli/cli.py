@@ -33,7 +33,7 @@ from linkhut_lib.linkhut_lib import (
 
 from .utils import parse_bulk_items, sanitize_tags
 
-app = typer.Typer(help="LinkHut CLI - Manage your bookmarks from the command line")
+app = typer.Typer(help="LinkHut CLI - Manage your bookmarks on LinkHut from the command line.")
 bookmarks_app = typer.Typer(help="Manage bookmarks")
 tags_app = typer.Typer(help="Manage tags")
 app.add_typer(bookmarks_app, name="bookmarks")
@@ -249,7 +249,7 @@ def add_bookmark(
         return
 
     fields_dict: dict[str, str] = create_bookmark(
-        url=url, title=title, note=note, tags=tags, private=private, to_read=to_read
+        url=url, title=title, note=note, tags=tags, private=private, to_read=to_read, replace=replace
     )
 
     if fields_dict.get("error") == "invalid_url":
@@ -324,7 +324,7 @@ def update_bookmark_cmd(
         False,
         "--replace",
         "-R",
-        help="Replace existing bookmark with the same URL. Default is False which appends the new tags and note to the existing bookmark",
+        help="Replace existing bookmark fields. Default is False which appends the new tags and note to the existing bookmark",
     ),
 ):
     """Update an existing bookmark in your LinkHut account.
@@ -447,10 +447,6 @@ def rename_tag_cmd(
     This command renames a tag across all your bookmarks, changing all instances
     of the old tag to the new tag name. This is useful for correcting typos or
     standardizing your tag naming conventions.
-
-    Args:
-        old_tag: The current tag name to be replaced
-        new_tag: The new tag name to use instead
     """
     if not check_env_variables():
         return
@@ -483,10 +479,6 @@ def delete_tag_cmd(
     """Delete a tag from all bookmarks.
 
     This command removes a specified tag from all your bookmarks. By default, it will ask for confirmation before deleting. Use the --force option to skip the confirmation prompt.
-
-    Args:\n
-        tag: The tag name to delete\n
-        force: Whether to skip the confirmation prompt (default: False)
     """
     if not check_env_variables():
         return
@@ -530,21 +522,7 @@ def reading_list_cmd(
     """Display your reading list or add/remove items from it.
 
     Without arguments, shows your reading list.
-    With URL and flags, adds/removes items from reading list using update_bookmark.
-
-    Examples:
-        linkhut reading-list                                    # Show reading list
-        linkhut reading-list --count 10                         # Show 10 items
-        linkhut reading-list https://example.com --to-read      # Add to reading list
-        linkhut reading-list https://example.com --read         # Mark as read
-        linkhut reading-list https://example.com --to-read --note "Important" --tag python
-
-    Args:
-        url: URL to add/remove from reading list (optional)
-        count: Number of bookmarks to show when displaying list
-        to_read: Whether to mark as to-read (True) or read (False)
-        note: Note to add when updating bookmark
-        tags: Tags to add if bookmark doesn't exist
+    With URL and flags, adds/removes items from reading list.
     """
     if not check_env_variables():
         return
