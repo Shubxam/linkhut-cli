@@ -13,9 +13,9 @@ A powerful command-line interface for managing your bookmarks with LinkHut. Effi
 - **Tag Management**: Rename and delete tags across all bookmarks
 - **Reading List**: Maintain a reading list with to-read/read status toggling
 - **Features**: 
-  - Automatic title fetching when adding bookmarks
-  - Tag suggestions based on bookmark content
-  - Rich formatting for improved readability
+  - Automatic title fetching when adding bookmarks.
+  - Tag suggestions based on bookmark content.
+  - Rich formatting for improved readability.
 
 ## Installation
 

@@ -1,11 +1,16 @@
-"""LinkHut Library - Core functions for interacting with LinkHut API.
+"""
+LinkHut Library - Core functions for interacting with LinkHut API.
 
 This module provides functions for managing bookmarks and tags through the LinkHut API,
 including creating, updating, listing and deleting bookmarks, as well as managing tags.
 """
 
+# todo: standardize error codes and messages across all functions
+
+import json
 import sys
 
+from httpx import Response
 from loguru import logger
 
 from . import utils
@@ -13,19 +18,19 @@ from . import utils
 logger.remove()
 logger.add(
     sys.stderr,
-    level="INFO",
+    level="ERROR",
     format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
 )
 
 
 def get_bookmarks(
-    tag: list[str] | None = None,
-    date: str | None = None,
-    url: str | None = None,
-    count: int | None = None,
-) -> tuple[dict[str, str], int]:
+    tag: str = "",
+    date: str = "",
+    url: str = "",
+    count: int = 0,
+) -> list[dict[str, str]]:
     """
-    Get bookmarks from LinkHut. Supports filtering or fetching recent bookmarks.
+    Get bookmarks from LinkHut. Supports filtering or fetching by recent count.
 
     - If 'count' is provided, fetches the most recent 'count' bookmarks,
       optionally filtered by the first tag in the 'tag' list. Uses /v1/posts/recent.
@@ -34,57 +39,84 @@ def get_bookmarks(
     - If no arguments are provided, fetches the 15 most recent bookmarks.
 
     Args:
-        tag (Optional[list[str]]): Filter by tags (for /get) or a single tag (first element used for /recent).
-        date (Optional[str]): Filter by date (CCYY-MM-DDThh:mm:ssZ format expected by /get).
-        url (Optional[str]): Filter by exact URL (for /get).
-        count (Optional[int]): Number of recent bookmarks to fetch (for /recent).
+        tag (str): Filter by tags (for /get) or a single tag (first element used for /recent).
+        date (str): Filter by date (CCYY-MM-DDThh:mm:ssZ format expected by /get).
+        url (str): Filter by exact URL (for /get).
+        count (int|None): Number of recent bookmarks to fetch (for /recent).
 
     Returns:
-        dict[str, list]: Response dictionary containing bookmarks.
+        list[dict]: list of dictionaries containing bookmark metadata.
     """
-    fields = {}
-    api_endpoint = ""
+    fields: dict[str, str] = {}
+    action: str
 
-    if count is not None:
-        api_endpoint = "/v1/posts/recent"
-        fields["count"] = count
+    # Determine action based on provided parameters
+    if count:
+        action = "bookmark_recent"
+        fields["count"] = str(count)
         if tag:
-            # /v1/posts/recent accept only one tag
-            fields["tag"] = tag[0]
-            logger.debug(f"Using first tag for /recent endpoint: {tag[0]}")
+            # bookmark_recent accept only one tag, if multiple tags are provided, then only the first one is used
+            # if presented with wrong tag, it returns {"posts": []}
+            fields["tag"] = tag.replace(",", " ").split()[0]
+            logger.debug(f"Using first tag for /recent endpoint: {fields['tag']}")
     elif tag or date or url:
-        api_endpoint = "/v1/posts/get"
+        action = "bookmark_get"
         if tag:
-            # /v1/posts/get expects tags=tag1+tag2...
-            fields["tag"] = ",".join(tag)
+            # bookmark_get expects tags=tag1+tag2...
+            fields["tag"] = tag.replace(" ", "+").replace(",", "+")
         if date:
-            # /v1/posts/get takes dt=CCYY-MM-DDThh:mm:ssZ
-            fields["dt"] = date  # TODO: Add validation/formatting for CCYY-MM-DDThh:mm:ssZ
+            try:
+                # bookmark_get takes dt=CCYY-MM-DD
+                utils.is_valid_date(date)  # validate date format
+            except ValueError as e:
+                logger.error(f"Invalid date format for {date}: {e}")
+                return [{"error": "invalid_date_format"}]
+            fields["dt"] = date
         if url:
-            # utils.verify_url(url)
-            fields["url"] = url  # TODO: Add URL encoding if necessary utils.encode_url(url)
+            # TODO: Add URL encoding
+            # no need to validate URL format here if user has imported the bookmark file, not all URLs will have http:// or https://
+            # try:
+            #     utils.verify_url(url)
+            # except ValueError as e:
+            #     logger.error(f"Invalid URL format for {url}: {e}")
+            #     return [{"error": "invalid_url_format"}]
+            fields["url"] = url
     else:
         # Default behavior: get recent 15 posts
-        api_endpoint = "/v1/posts/recent"
-        fields["count"] = 15
+        action = "bookmark_recent"
+        fields["count"] = "15"
 
-    response_obj, response_code = utils.linkhut_api_call(
-        api_endpoint=api_endpoint, fields=fields if fields else None
-    )
+    try:
+        response: Response = utils.linkhut_api_call(action=action, payload=fields)
+        fetched_bookmarks: list[dict[str, str]] = response.json().get("posts", [])
 
-    return response_obj, response_code
+        # if bookmarks are found, posts list will not be empty
+        if fetched_bookmarks:
+            logger.debug("Bookmarks fetched successfully")
+            return fetched_bookmarks
+        elif response.json().get("result_code") == "something went wrong" or not fetched_bookmarks:
+            # result code "something went wrong" indicates posts/get endpoint was called with wrong url
+            # todo: update logger error class severity equal to debug
+            logger.warning("No Bookmarks Found")
+            return [{"error": "no_bookmarks_found"}]
+        else:
+            logger.warning("No bookmarks found for the given criteria")
+            return [{"error": "unknown_error"}]
+    except Exception as e:
+        logger.error(f"Error fetching bookmarks: {e}")
+        return [{"error": "error_fetching_bookmarks"}]
 
 
 def create_bookmark(
     url: str,
-    title: str | None = None,
-    note: str | None = None,
-    tags: list[str] | None = None,
+    title: str = "",
+    note: str = "",
+    tags: str = "",  # could be of form: "tag1,tag2" or "tag1 tag2" or "tag1 tag2,tag3"
     fetch_tags: bool = True,
     private: bool = False,
     to_read: bool = False,
     replace: bool = False,
-) -> int:
+) -> dict[str, str]:
     """
     Create a new bookmark in LinkHut.
 
@@ -94,200 +126,184 @@ def create_bookmark(
 
     Args:
         url (str): The URL to bookmark
-        title (Optional[str]): Title for the bookmark. If None, fetches automatically.
-        note (Optional[str]): Extended notes or description for the bookmark
-        tags (Optional[list[str]]): List of tags to apply to the bookmark
+        title (str): Title for the bookmark. If None, fetches automatically.
+        note (str): Extended notes or description for the bookmark
+        tags (str): Comma-separated list of tags to apply to the bookmark
         fetch_tags (bool): Whether to auto-suggest tags if none provided (default: True)
         private (bool): Whether the bookmark should be private (default: False)
         to_read (bool): Whether to mark the bookmark as "to read" (default: False)
         replace (bool): Whether to replace an existing bookmark with the same URL (default: False)
 
     Returns:
-        int: HTTP status code (200 for success)
+        dict[str, str]: The created bookmark's metadata
     """
-    utils.verify_url(url)
+    try:
+        # must start with http:// or https://
+        utils.verify_url(url)
+    except Exception as e:
+        logger.error(f"Invalid URL: {url}. Error: {e}")
+        return {"error": "invalid_url"}
+
+    action = "bookmark_create"
 
     # If title not provided, try to fetch it
-    if title is None:
-        try:
-            title = utils.get_link_title(url)
-            logger.debug(f"Auto-fetched title: {title}")
-        except Exception as e:
-            logger.warning(f"Failed to auto-fetch title: {e}")
-            title = url
+    if not title:
+        title = utils.get_link_title(url)
 
-    # If tags not provided, try to fetch suggestions
-    if tags is None and fetch_tags:
-        try:
-            suggested_tags: list[str] = utils.get_tags_suggestion(url)
-            tags = suggested_tags
-        except Exception as e:
-            logger.warning(f"Failed to auto-suggest tags: {e}")
-            tags = []
+    # If valid tags not provided, try to fetch suggestions
+    if not tags.isalnum() and fetch_tags:
+        tags_str: str = utils.get_tags_suggestion(url)  # comma separated tags
+        tags = tags_str.replace(",", " ").replace(" ", "+")  # convert to + separated tags
+
+    # checks if tag string in argument is not just a whitespace or empty string
+    elif tags.isalnum():
+        _tag_list: list[str] = tags.replace(",", " ").split()
+        tags = "+".join(_tag_list)
 
     # Prepare API payload
-    fields = {"url": url, "description": title}
+    fields: dict[str, str] = {}
+    fields["url"] = url
+    fields["description"] = title
+    fields["tags"] = tags
+    fields["replace"] = "yes" if replace else "no"
+    fields["toread"] = "yes" if to_read else "no"
+    fields["shared"] = "no" if private else "yes"
 
     if note:
         fields["extended"] = note
 
-    if private:
-        fields["shared"] = "no"
-
-    if tags:
-        fields["tags"] = ",".join(tags)
-
-    if to_read:
-        fields["toread"] = "yes"
-    if replace:
-        fields["replace"] = "yes"
-
-    # Make API call
-    api_endpoint = "/v1/posts/add"
-    _, status_code = utils.linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
-
-    if status_code == 200:
-        logger.debug(f"Bookmark created successfully: {fields}")
-
-    return status_code
-
-
-def reading_list_toggle(
-    url: str, to_read: bool, note: str | None = None, tags: list[str] | None = None
-) -> bool:
-    """
-    Toggle the to-read status of a bookmark.
-
-    This function either updates an existing bookmark's to-read status or creates a new
-    bookmark with the specified to-read status if it doesn't exist.
-
-    Args:
-        url (str): The URL of the bookmark to toggle
-        to_read (bool): Whether to mark as to-read (True) or read (False)
-        note (Optional[str]): Note to append to the bookmark if provided
-        tags (Optional[list[str]]): Tags to add if creating a new bookmark
-
-    Returns:
-        bool: True if the operation was successful, False otherwise
-    """
-
-    bookmark_create_status_code: None | int = None
-
-    # check if bookmark with url already exists,
-    bookmark_dict, bookmark_exist_status_code = get_bookmarks(url=url)
-
-    # if no, then create a new bookmark with toread=yes'
-    if bookmark_exist_status_code == 404:
-        logger.debug(f"Bookmark with URL {url} not found. Creating a new one.")
-        bookmark_create_status_code = create_bookmark(
-            url=url, to_read=to_read, note=note, tags=tags
-        )
-
-    # if yes
-    elif bookmark_exist_status_code == 200:
-        # get existing bookmark meta
-        logger.debug(f"Bookmark with URL {url} already exists.")
-        to_read_current = bookmark_dict.get("posts")[0].get("toread") == "yes"
-        embed_note = bookmark_dict.get("posts")[0].get(
-            "extended"
-        )  # append new note to existing note
-        title = bookmark_dict.get("posts")[0].get("description")
-        tags = bookmark_dict.get("posts")[0].get("tags").split(",")
-        private = bookmark_dict.get("posts")[0].get("shared") == "no"
-        logger.debug(
-            f"Bookmark with URL {url} current status to_read = {to_read_current}, changing to {to_read}"
-        )
-
-        # check if toread is already set to the desired value and no new note to append
-        if to_read_current == to_read and note is None:
-            logger.debug(
-                f"Bookmark with URL {url} already has the desired to_read status. Nothing to do."
-            )
-            return False
-
-        # if not, update the bookmark with the new toread status and note
-        bookmark_create_status_code = create_bookmark(
-            url=url,
-            title=title,
-            replace=True,
-            to_read=to_read,
-            note=embed_note + note if note else embed_note + "",
-            fetch_tags=False,
-            tags=tags,
-            private=private,
-        )
-
-    if bookmark_create_status_code == 200:
-        logger.debug(f"Bookmark with URL {url} successfully created or updated to read.")
-        return True
-    else:
-        logger.error(
-            f"Failed to create or update bookmark with URL {url}. Status code: {bookmark_create_status_code}"
-        )
-        return False
+    try:
+        response: Response = utils.linkhut_api_call(action=action, payload=fields)
+        response_dict: dict[str, str] = response.json()
+        status_code: int = response.status_code
+        if status_code == 200 and response_dict.get("result_code") == "done":
+            logger.debug(f"Bookmark created successfully: {response_dict}")
+            return fields
+        else:
+            logger.warning(f"Failed to create bookmark: {response_dict}")
+            return {"error": "bookmark_exists"}
+    except Exception as e:
+        logger.error(f"Error creating bookmark: {e}")
+        return {"error": "API error"}
 
 
 def update_bookmark(
     url: str,
-    new_tag: list[str] | None = None,
-    new_note: str | None = None,
-    private: bool | None = None,
-) -> bool:
+    new_tag: str = "",
+    new_note: str = "",
+    new_private: bool | None = None,
+    new_to_read: bool | None = None,
+    replace: bool = False,  # whether to replace data or append to existing data
+) -> dict[str, str]:
     """
     Update an existing bookmark or create a new one if it doesn't exist.
 
-    This function allows updating the tags, notes, and privacy settings of a bookmark.
+    This function allows updating the tags, notes, privacy settings, and to-read status of a bookmark.
     If the bookmark doesn't exist, it will create a new one with the provided parameters.
+    This function replaces the previous reading_list_toggle function.
 
     Args:
         url (str): The URL of the bookmark to update
-        new_tag (Optional[list[str]]): New tags to set for the bookmark (replaces existing tags)
-        new_note (Optional[str]): Note to append to the existing note
-        private (Optional[bool]): Whether to set the bookmark as private (True) or public (False)
+        new_tag (str): New tags to set for the bookmark (replaces existing tags if replace=True)
+        new_note (str): Note to append to the existing note (or replace if replace=True)
+        new_private (str): Whether to set the bookmark as private ("yes") or public ("no")
+        to_read (bool | None): Whether to mark as to-read (True) or read (False). None means no change.
+        replace (bool): Whether to replace existing data or append to it
 
     Returns:
-        bool: True if the update was successful, False otherwise
+        dict[str, str]: Status information about the update operation
     """
-    # todo: add append to tags
 
     # check if there is nothing to update, if so return false
-    if new_tag is not None and new_note is not None and private is not None:
+    if not new_tag and not new_note and new_private is None and new_to_read is None:
         logger.debug("No updates provided. Nothing to do.")
-        return False
+        return {"status": "missing_update_parameters"}
+
+    fields_to_inherit: set[str] = {"description", "tags", "extended", "shared", "toread"}
+
+    # check for existing bookmark with the given URL
+    fetched_bookmark: dict[str, str] = get_bookmarks(url=url)[0]
+
+    # if no, then create a new bookmark with given values
+    if fetched_bookmark.get("error") == "no_bookmarks_found":
+        logger.debug(f"Bookmark with URL {url} not found. Creating a new one.")
+        private: bool = new_private if new_private is not None else False
+        to_read: bool = new_to_read if new_to_read is not None else False
+        bookmark_meta: dict[str, str] = create_bookmark(
+            url=url, tags=new_tag, note=new_note, private=private, to_read=to_read
+        )
+        bookmark_meta["status"] = "no_bookmark_found"
+        return bookmark_meta
+
+    elif fetched_bookmark.get("error") == "invalid_url_format":
+        logger.debug(f"Invalid URL format: {url}. Please provide a valid URL.")
+        # propagate the error to the calling function
+        return {"error": "invalid_url_format"}
+
+    elif fetched_bookmark.get("error"):
+        logger.debug("Unexpected error occurred while fetching bookmark data.")
+        return {"error": "unknown_error"}
+
+    # if yes
+    elif fields_to_inherit.issubset(fetched_bookmark.keys()):
+        # get existing bookmark meta
+        title: str = fetched_bookmark.get("description", url)
+        tags: str = fetched_bookmark.get("tags", "")
+        note: str = fetched_bookmark.get("extended", "")
+        current_toread: bool = fetched_bookmark.get("toread") == "yes"
+        current_private: bool = fetched_bookmark.get("shared") == "no"
+
+        # Determine privacy setting
+        if new_private is not None:
+            private: bool = new_private
+        else:
+            private: bool = current_private
+
+        # Determine to_read setting
+        if new_to_read is not None:
+            final_toread = new_to_read
+        else:
+            final_toread = current_toread
+
+        # Check if no actual changes are needed
+        if (
+            new_to_read is not None
+            and current_toread == new_to_read
+            and new_private is not None
+            and current_private == new_private
+            and not new_tag
+            and not new_note
+        ):
+            logger.info(f"Bookmark with URL {url} already has the desired status. Nothing to do.")
+            return {"status": "no_update_needed"}
+
+        logger.info(f"Bookmark with URL {url} already exists. Updating it.")
+
+        # Refactored tag and note concatenation for clarity
+        if replace:
+            updated_tags = new_tag
+            updated_note = new_note
+        else:
+            updated_tags = f"{tags} {new_tag}".strip() if new_tag else tags
+            updated_note = f"{note} {new_note}".strip() if new_note else note
+
+        bookmark_meta = create_bookmark(
+            url=url,
+            title=title,
+            tags=updated_tags,
+            note=updated_note,
+            private=private,
+            replace=True,
+            fetch_tags=False,
+            to_read=final_toread,
+        )
+        return bookmark_meta
     else:
-        # check if bookmark with url already exists,
-        bookmark_dict, bookmark_exist_status_code = get_bookmarks(url=url)
-        # if no, then create a new bookmark with given values
-        if bookmark_exist_status_code == 404:
-            logger.debug(f"Bookmark with URL {url} not found. Creating a new one.")
-            _ = create_bookmark(url=url, tags=new_tag, note=new_note, private=True)
-        # if yes
-        elif bookmark_exist_status_code == 200:
-            # get existing bookmark meta
-            bm_data = bookmark_dict.get("posts")[0]
-            title = bm_data.get("description")
-            tags = new_tag if new_tag else bm_data.get("tags").split(",")  # convert str to list
-            note = bm_data.get("extended") + new_note if new_note else bm_data.get("extended")
-            private = private if private is not None else bm_data.get("shared") == "no"
-            toread = bm_data.get("toread") == "yes"
-
-            logger.debug(f"Bookmark with URL {url} already exists. Updating it.")
-            _ = create_bookmark(
-                url=url,
-                title=title,
-                tags=tags,
-                note=note,
-                private=private,
-                replace=True,
-                fetch_tags=False,
-                to_read=toread,
-            )
-
-        logger.debug(f"Bookmark with URL {url} successfully updated.")
-        return True
+        logger.debug("Unexpected bookmark format received. Missing required fields.")
+        return {"error": "unknown_error"}
 
 
-def get_reading_list(count: int = 5):
+def get_reading_list(count: int = 5) -> list[dict[str, str]]:
     """
     Fetch and display the user's reading list (bookmarks marked as to-read).
 
@@ -297,13 +313,19 @@ def get_reading_list(count: int = 5):
     Returns:
         None: Results are printed directly to stdout
     """
-    reading_list, status_code = get_bookmarks(tag=["unread"], count=count)
-    if status_code == 200:
-        logger.debug(f"Reading list fetched successfully: {reading_list}")
+    reading_list: list[dict[str, str]] = get_bookmarks(tag="unread", count=count)
+    if reading_list[0].get("error") == "no_bookmarks_found":
+        logger.info("No bookmarks found in the reading list.")
+        return [{"error": "no_bookmarks_found"}]
+    elif reading_list:
+        logger.debug(f"Reading list fetched successfully: {json.dumps(reading_list, indent=2)}")
         return reading_list
+    else:
+        logger.error("No bookmarks found in the reading list.")
+        return [{"error": "api_error"}]
 
 
-def delete_bookmark(url: str) -> bool:
+def delete_bookmark(url: str) -> dict[str, str]:
     """
     Delete a bookmark.
 
@@ -313,20 +335,31 @@ def delete_bookmark(url: str) -> bool:
     Returns:
         Dict[str, Any]: Response from the API
     """
-    api_endpoint = "/v1/posts/delete"
-    fields = {"url": url}
+    action: str = "bookmark_delete"
+    fields: dict[str, str] = {"url": url}
 
-    _, status_code = utils.linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
+    try:
+        # verify the URL format before making the API call
+        utils.verify_url(url)
+        response: Response = utils.linkhut_api_call(action=action, payload=fields)
+    except ValueError as e:
+        logger.error(f"Invalid URL format: {url}. Error: {e}")
+        return {"error": "invalid_url_format"}
+    except Exception as e:
+        logger.error(f"Error deleting bookmark: {e}")
+        return {"error": "api_error"}
 
-    if status_code == 200:
+    result_code: str = response.json().get("result_code", "")
+
+    if result_code == "done":
         logger.debug(f"Bookmark with URL {url} successfully deleted.")
-        return True
+        return {"bookmark_deletion": "success"}
     else:
-        logger.error(f"No bookmark with URL {url} exists. Status code: {status_code}")
-        return False
+        logger.error(f"Unable to delete bookmark with URL {url}. Result code: {result_code}")
+        return {"bookmark_deletion": "failure"}
 
 
-def rename_tag(old_tag: str, new_tag: str) -> bool:
+def rename_tag(old_tag: str, new_tag: str) -> dict[str, str]:
     """
     Rename a tag across all bookmarks.
 
@@ -337,20 +370,33 @@ def rename_tag(old_tag: str, new_tag: str) -> bool:
     Returns:
         Dict[str, Any]: Response from the API
     """
-    api_endpoint = "/v1/tags/rename"
+    action = "tag_rename"
     fields = {"old": old_tag, "new": new_tag}
 
-    _, status_code = utils.linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
+    try:
+        # verify the tag format before making the API call
+        if not utils.is_valid_tag(old_tag) or not utils.is_valid_tag(new_tag):
+            raise ValueError(f"Invalid tag format: {old_tag} or {new_tag}")
+        response: Response = utils.linkhut_api_call(action=action, payload=fields)
+    except ValueError as e:
+        logger.error(f"Invalid tag format: {old_tag} or {new_tag}. Error: {e}")
+        return {"error": "invalid_tag_format"}
+    except Exception as e:
+        logger.error(f"Error renaming tag: {e}")
+        return {"error": "api_error"}
 
-    if status_code == 200:
-        logger.debug(f"Tag '{old_tag}' successfully renamed to '{new_tag}'.")
-        return True
+    result_code: str = response.json().get("result_code", "")
+
+    if result_code == "done":
+        logger.info(f"Tag '{old_tag}' successfully renamed to '{new_tag}'.")
+        return {"tag_renaming": "success"}
     else:
-        logger.error(f"Failed to rename tag '{old_tag}' to '{new_tag}'. Status code: {status_code}")
-        return False
+        logger.error(f"Failed to rename tag '{old_tag}' to '{new_tag}'. Result code: {result_code}")
+        return {"tag_error": "unsuccessful"}
 
 
-def delete_tag(tag: str) -> bool:
+# todo: #20 update error handling for delete_tag, rename_tag
+def delete_tag(tag: str) -> dict[str, str]:
     """
     Delete a tag from all bookmarks.
 
@@ -360,17 +406,29 @@ def delete_tag(tag: str) -> bool:
     Returns:
         Dict[str, Any]: Response from the API
     """
-    api_endpoint = "/v1/tags/delete"
-    fields = {"tag": tag}
+    action: str = "tag_delete"
+    fields: dict[str, str] = {"tag": tag}
 
-    _, status_code = utils.linkhut_api_call(api_endpoint=api_endpoint, fields=fields)
+    try:
+        # verify the tag format before making the API call
+        if not utils.is_valid_tag(tag):
+            raise ValueError
+        response: Response = utils.linkhut_api_call(action=action, payload=fields)
+    except ValueError as e:
+        logger.error(f"Invalid tag format for {tag}: {e}.")
+        return {"error": "invalid_tag_format"}
+    except Exception as e:
+        logger.error(f"Error deleting tag: {e}")
+        return {"error": "api_error"}
 
-    if status_code == 200:
+    result_code: str = response.json().get("result_code", "")
+
+    if result_code == "done":
         logger.debug(f"Tag '{tag}' successfully deleted.")
-        return True
+        return {"tag_deletion": "success"}
     else:
-        logger.error(f"Failed to delete tag '{tag}'. Tag doesn't exist. Status code: {status_code}")
-        return False
+        logger.error(f"Failed to delete tag '{tag}'. Tag doesn't exist. Result code: {result_code}")
+        return {"tag_deletion": "unsuccessful"}
 
 
 # def get_tags() -> List[Dict[str, Any]]:
@@ -393,13 +451,13 @@ if __name__ == "__main__":
     # These examples show how to use the library functions directly
     # Uncomment any of these lines to test the functionality
 
-    # url = "https://huggingface.co/blog/gradio-mcp"
+    url = "https://huggingface.co"
     # title = "Example Title"
     # note = "This is a note."
     # tags = ["tag1", "tag2"]
 
     # 1. Create a new bookmark
-    # create_bookmark(url=url)
+    create_bookmark(url=url)
 
     # 2. Mark a bookmark as to-read
     # reading_list_toggle(url, to_read=True, tags=['MCP'])
@@ -411,7 +469,7 @@ if __name__ == "__main__":
     # delete_bookmark(url)
 
     # 5. List bookmarks with a specific tag
-    print(get_bookmarks(tag=["blog"]))
+    # print(get_bookmarks(tag=["blog"]))
 
     # 6. Show reading list
     # get_reading_list(count=5)
