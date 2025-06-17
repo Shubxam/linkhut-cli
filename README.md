@@ -16,7 +16,7 @@ A powerful command-line interface for managing your bookmarks with LinkHut. Effi
   - Automatic title fetching when adding bookmarks.
   - Tag suggestions based on bookmark content.
   - Rich formatting for improved readability.
-  - Auto completion for commands and options using Tab key.
+  - Auto completion for commands and options using <Tab> key.
 
 ## Installation
 
