@@ -3,7 +3,7 @@ import re
 
 def parse_bulk_items(content: str) -> list[str]:
     """
-    Parse a string of items(URLs, tags) separated by newlines, commas, whitespace into a list of items.
+    Parse a string of items(URLs, tags) separated by newlines, commas into a list of items.
     Args:
         content (str): A string containing items separated by newlines, commas, whitespace.
     Returns:
